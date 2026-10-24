@@ -31,7 +31,7 @@
 - **Dictée progressive**（Listening 页，也可从阅读页和短文页的 Dictée 按钮进）：30 篇阅读和 10 篇短文都能当课堂式听写：整篇常速听一遍 → 逐句以 breath group 慢读、你打字、立刻判分 → 整篇再听一遍并逐句标出错处。最好成绩存在 `S.dictee`。
 - **Mine**（第四个 tab）：把日常遇到的法语贴进来存着。每条文本可以逐句朗读、慢读、做 Dictée；点 Explain this text 让 Claude 按课程阅读的格式写讲解（逐段英译、生词、句型、俗语、语法），跑在你自己的 Claude 账号上，第一次会弹权限。文本存在账号下 `data/users/<id>/texts/items/<id>`，每条一个 document，本地也留一份；改正文会清掉旧讲解。
 - **My notes**（Mine 每条文本的卡片）：自由文本，贴你自己或任何助手给的讲解（生词、句型、翻译、问题），和文本一起存进账号、进备份。空行分段，`-`、`•`、`1.` 开头的行成列表，`#` 或「Vocabulaire :」这类单独一行成小标题，`**粗体**` 可用，其余照原样显示。想要和课程阅读一样的结构化讲解（分段英译、Vocabulary、Sentence patterns、Idioms、Grammar 五个卡片），用 Explain 卡片里的 Copy prompt，把助手返回的 JSON 贴回 Use this answer。
-- **录音**（Mine）：一条文本可以带一个录音文件名（导入文件里的 `audio` 字段，或 Edit 里填）。打开文本时上方出现 Recording 卡片：第一次点 Choose the folder 选中放录音的文件夹（文件只在本机浏览器里用，不上传；播放过的文件会缓存进 IndexedDB，下次不用再选）。播放器有 −3 s、0.7× / 0.85× / 1× 变速和 A–B 区间：按 A、B 标出一段，播放到 B 自动停并回到 A，Loop 反复。Dictée from the recording 用真人录音做听写：先整段听，再逐个 turn 写——按 Play 听，在这个 turn 结束处按 B，这一段就被隔离出来反复听，写完 Check 判分（同样分 by ear / spelling）。按 Next 时 A–B 保存到文本的 `marks` 里，下次每个 turn 自动按段播放。Listening 页的 Mine 组里带录音的文本直接进这种听写。浏览器放不了 `.wma`，要先转成 `.mp3`（见下文），同名即可。
+- **录音**（Mine）：一条文本可以带一个录音文件名（导入文件里的 `audio` 字段，或 Edit 里填）。打开文本时上方出现 Recording 卡片：第一次点 Choose the folder 选中 `audio/` 这个文件夹（`python3 tools/collect-audio.py` 把文本用到的 145 个录音收在这里，按书分四个子目录；文件只在本机浏览器里用，不上传；播放过的文件会缓存进 IndexedDB，下次不用再选）。播放器有 −3 s、0.7× / 0.85× / 1× 变速和 A–B 区间：按 A、B 标出一段，播放到 B 自动停并回到 A，Loop 反复。Dictée from the recording 用真人录音做听写：先整段听，再逐个 turn 写——按 Play 听，在这个 turn 结束处按 B，这一段就被隔离出来反复听，写完 Check 判分（同样分 by ear / spelling）。按 Next 时 A–B 保存到文本的 `marks` 里，下次每个 turn 自动按段播放。Listening 页的 Mine 组里带录音的文本直接进这种听写。浏览器放不了 `.wma`，要先转成 `.mp3`（见下文），同名即可。
 - **Numbers**（Listening 页）：程序生成的数字听写，每轮十题，混合数字、年份、时刻、价格、电话号码、日期；答案打数字（17h45、32,60、23/10/2026、06 42 18 73 95 等格式都接受）。
 - **Slower / Slow**：Dictation、Listen & pick 里的 Slower 按钮和短文页的 Slow 开关不靠 voice 的 rate 参数——Apple 的 Premium / Enhanced voice 基本不理这个参数，所以以前慢速和常速听不出差别——而是把句子切成呼吸组（标点处，再在连词、关系代词、介词前），每组降速念，组之间停顿；任何 voice 上都明显更慢。
 
@@ -87,6 +87,7 @@ B="french/French/en Dialogues"
 CROP=0,0,0.68,1 /tmp/ocr-pdf "$B/Vocabulaire/A2-B1 Vocabulaire en Dialogues Niveau Intermédiaire.pdf" library/ocr/vocb1c 1-64 3
 CROP=0,0,0.68,1 /tmp/ocr-pdf "$B/Vocabulaire/A2-B1 Vocabulaire en Dialogues Niveau Intermédiaire.pdf" library/ocr/vocb1d 1-64 2.2
 python3 tools/extract-dialogues.py
+python3 tools/collect-audio.py                      # 把文本引用的录音收进 audio/<book>/（硬链接，不占第二份空间）
 ```
 
 `ocr-pdf` 每页写一个 JSON（识别出的每行文字和位置；`PNG=1` 顺便存页面图，`CROP` 只渲染页面的一部分——A2-B1 那本是跨页扫描，只取左页，并且跑两个分辨率合并，补书脊附近掉的词）。`extract-dialogues.py` 按版面找出对话框（大写标题 + 「人名 : 台词」或「– 台词」的行，支持双栏），拼回换行的句子，去掉脚注和图片标签，修 OCR 常见错（脚注记号读成 `'` `!` `?`，句首 J 读成 l），写出四个导入文件，每条带 `audio`（录音文件名）：
@@ -106,7 +107,7 @@ cd "french/French/en Dialogues/Vocabulaire/A0-A1 Vocabulaire en Dialogues Niveau
 for f in *.wma; do ffmpeg -n -i "$f" -codec:a libmp3lame -q:a 4 "${f%.wma}.mp3"; done
 ```
 
-其余没有文字层也没有录音的书（Grammaire en dialogues、Progressive 系列、丁丁）同样可以 OCR，但现在的抽取脚本只认 en Dialogues 的对话版面。
+`audio/` 和 `library/` 一样不进仓库。其余没有文字层也没有录音的书（Grammaire en dialogues、Progressive 系列、丁丁）同样可以 OCR，但现在的抽取脚本只认 en Dialogues 的对话版面。
 
 ## 发布
 

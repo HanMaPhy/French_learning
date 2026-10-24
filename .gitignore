@@ -2,6 +2,7 @@
 french/
 library/
 backups/
+audio/
 # OS and editor noise
 .DS_Store
 Thumbs.db
