@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1'];
-  const BUILD = 11; // bump together with the ?v= on the script tags in index.html whenever the scripts change
+  const BUILD = 12; // bump together with the ?v= on the script tags in index.html whenever the scripts change
 
   // ---------- merge data files into one book ----------
   const BOOK = [];
@@ -103,7 +103,7 @@
     list.forEach(t => {
       if (!t || typeof t.text !== 'string' || !t.text.trim()) return;
       const ps = paragraphs(t.text), key = norm(ps.join(' ')).slice(0, 200); if (!ps.length || have.has(key)) return; have.add(key);
-      const nt = { title: String(t.title || '').trim().slice(0, 80) || ps[0].slice(0, 60), autoTitle: !t.title, text: ps.join('\n'), src: String(t.src || '').slice(0, 80), level: /^(A1|A2|B1|B2|C1)$/.test(t.level) ? t.level : '', ex: t.ex && typeof t.ex === 'object' ? t.ex : null, added: Date.now() - n, audio: typeof t.audio === 'string' ? t.audio.trim().slice(0, 120) : '' };
+      const nt = { title: String(t.title || '').trim().slice(0, 80) || ps[0].slice(0, 60), autoTitle: !t.title, text: ps.join('\n'), src: String(t.src || '').slice(0, 80), level: /^(A1|A2|B1|B2|C1)$/.test(t.level) ? t.level : '', ex: t.ex && typeof t.ex === 'object' ? t.ex : null, added: Date.now() - n, audio: typeof t.audio === 'string' ? t.audio.trim().slice(0, 120) : '', notes: typeof t.notes === 'string' ? t.notes.trim().slice(0, 20000) : '' };
       if (t.marks && typeof t.marks === 'object' && !Array.isArray(t.marks)) nt.marks = t.marks; // a recording's turn boundaries (see app-audio.js)
       texts.add(nt); n++;
     });

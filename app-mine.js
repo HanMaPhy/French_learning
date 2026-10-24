@@ -33,7 +33,20 @@ The paragraphs, as a JSON array:
 ${JSON.stringify(ps)}`;
   // the answer as an assistant pastes it: the whole text as JSON, else the body of a code fence, else from the first { to the last }
   const parseAnswer = txt => { const s = String(txt || '').trim(); const tries = [s, (s.match(/```(?:json)?\s*([\s\S]*?)```/) || [])[1], s.slice(s.indexOf('{'), s.lastIndexOf('}') + 1)]; for (const c of tries) { if (!c) continue; try { const v = JSON.parse(c); if (v && typeof v === 'object') return v; } catch (e) { /* next */ } } return null; };
-  A.mine = { asReading, sanitize, prompt, parseAnswer };
+  // the learner's own notes on a text: whatever they worked out or an assistant wrote for them, pasted as is; the few marks assistants
+  // use (blank lines, - or 1. lists, # or « Titre : » headings, **bold**) are rendered, the rest is kept as typed
+  const notesHtml = s => {
+    const inline = x => esc(x).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>');
+    const out = []; let list = null; const flush = () => { if (list) { out.push('<ul>' + list.map(x => `<li>${x}</li>`).join('') + '</ul>'); list = null; } };
+    String(s || '').replace(/\r/g, '').split('\n').forEach(line => {
+      const l = line.trim(); if (!l) { flush(); return; }
+      const m = l.match(/^(?:[-*•–]|\d+[.)])\s+(.*)/); if (m) { (list = list || []).push(inline(m[1])); return; }
+      flush(); const h = l.match(/^#+\s*(.*)/);
+      if (h) out.push(`<h3>${inline(h[1])}</h3>`); else if (/^[^:]{2,48}:$/.test(l)) out.push(`<h3>${inline(l.slice(0, -1).trim())}</h3>`); else out.push(`<p>${inline(l)}</p>`);
+    });
+    flush(); return out.join('');
+  };
+  A.mine = { asReading, sanitize, prompt, parseAnswer, notesHtml };
 
   const fmtDate = t => new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
   const autoTitle = text => { const p0 = paras(text)[0] || '', mm = p0.match(/^(.*?[.!?…])(\s|$)/), first = mm ? mm[1] : p0; return first.length > 60 ? first.slice(0, 57).replace(/\s+\S*$/, '') + '…' : first; };
@@ -65,11 +78,24 @@ ${JSON.stringify(ps)}`;
     });
   };
 
+  // the recording's marks are keyed by paragraph: after an edit, each marked paragraph is found again by its words (so a corrected word, or a line
+  // added above, does not lose the mark), and a paragraph that is gone loses its mark
+  const remap = (marks, before, after) => {
+    if (!marks) return marks;
+    const key = s => A.norm(s), keys = after.map(key), out = {}; let used = new Set();
+    Object.entries(marks).forEach(([i, m]) => {
+      const k = key(before[+i] || ''); if (!k) return;
+      let j = keys.findIndex((x, n) => !used.has(n) && x === k);
+      if (j < 0) j = keys.findIndex((x, n) => !used.has(n) && x.slice(0, 24) === k.slice(0, 24));
+      if (j >= 0) { out[j] = m; used.add(j); }
+    });
+    return out;
+  };
   // ---------- one text: read, explain, dictée, edit, delete ----------
   let U = null, ctl = null;
   views.mytext = v => {
     const t = A.state().texts[v.id]; if (!t) return views.mine();
-    if (!U || U.id !== t.id) U = { id: t.id, en: false, slow: false, busy: false, err: '', edit: false };
+    if (!U || U.id !== t.id) U = { id: t.id, en: false, slow: false, busy: false, err: '', edit: false, notes: false };
     const r = asReading(t);
     const head = `<div class="lesson-head"><div class="row"><button class="btn ghost" data-go="mine">← Mine</button>${t.level ? `<span class="pill lvl">${esc(t.level)}</span>` : ''}<span class="pill num">${A.reading.words(r)} words</span>${t.src ? `<span class="pill">${esc(t.src)}</span>` : ''}<span class="pill num">${fmtDate(t.added)}</span></div>
       <h1 class="fr" style="font-size:1.8rem">${fr(t.title)}</h1>${r.intro ? `<p class="en">${esc(r.intro)}</p>` : ''}</div>`;
@@ -89,7 +115,10 @@ ${JSON.stringify(ps)}`;
         <textarea class="dict" id="pasteAnswer" placeholder="Paste the JSON answer here…" style="min-height:110px;font-size:.95rem;font-family:var(--font-ui);margin-top:10px" spellcheck="false"></textarea>
         <div class="actions"><button class="btn primary" id="useAnswer">Use this answer</button></div></details></div>`;
     const audio = t.audio ? A.audio.card(t.audio, { buttons: `<button class="btn" data-go="adictee|${t.id}">Dictée from the recording</button>` }) : '';
-    return head + audio + A.reading.textCard(r, U, { dictee: 'mine:' + t.id }) + explain + (t.ex ? A.reading.notesCards(r) : '')
+    const notes = `<div class="card"><div class="row"><span class="eyebrow">My notes</span><span class="en" style="font-size:.9rem">${t.notes || U.notes ? '' : 'what you worked out, or what an assistant wrote for you'}</span><span class="grow"></span>${U.notes ? '' : `<button class="btn ghost" id="editNotes">${t.notes ? 'Edit' : 'Add notes'}</button>`}</div>
+      ${U.notes ? `<textarea class="dict" id="notesText" placeholder="Paste or write anything: vocabulary, patterns, a translation, questions to ask…" style="min-height:180px;font-size:1rem;font-family:var(--font-ui);margin-top:10px" spellcheck="false">${esc(t.notes || '')}</textarea><div class="actions"><button class="btn" id="cancelNotes">Cancel</button><button class="btn primary" id="saveNotes">Save</button></div>`
+        : t.notes ? `<div class="notes-box">${notesHtml(t.notes)}</div>` : ''}</div>`;
+    return head + audio + A.reading.textCard(r, U, { dictee: 'mine:' + t.id }) + explain + (t.ex ? A.reading.notesCards(r) : '') + notes
       + `<div class="card"><div class="row"><span class="eyebrow">This text</span><span class="grow"></span>${t.ex ? `<button class="btn ghost" id="reexplain" ${U.busy ? 'disabled' : ''}>${U.busy ? 'Thinking…' : 'Explain again'}</button>` : ''}<button class="btn ghost" id="editText">Edit</button><button class="btn ghost" id="delText">Delete</button></div>${t.ex && U.err ? `<p class="en" style="margin-top:6px">${esc(U.err)}</p>` : ''}</div>`;
   };
   const COPY = { not_granted: 'You did not allow this page to use Claude. Allow it from the page\'s Permissions menu and try again.', sampling_disabled: 'Claude is not available on this account.', rate_limited: 'Claude is busy or your usage limit is reached: try again in a little while.', session_expired: 'Please sign in to claude.ai again.', refused: 'Claude declined to explain this text.', invalid_json: 'The answer could not be read: try once more, or shorten the text.', prompt_too_large: 'This text is too long for one explanation: split it in two.', empty_completion: 'Claude gave no answer: try once more.', cancelled: '' };
@@ -112,7 +141,8 @@ ${JSON.stringify(ps)}`;
       $('edSave').addEventListener('click', () => {
         const text = paras($('edText').value).join('\n'), title = $('edTitle').value.trim().slice(0, 80) || autoTitle(text), src = $('edSrc').value.trim().slice(0, 80);
         if (!text) { toast('The text cannot be empty'); return; }
-        const patch = { title, src, audio: $('edAudio').value.trim().slice(0, 120), autoTitle: title === t.title ? t.autoTitle : false }; if (text !== t.text) Object.assign(patch, { text, ex: null, level: '' });
+        const patch = { title, src, audio: $('edAudio').value.trim().slice(0, 120), autoTitle: title === t.title ? t.autoTitle : false };
+        if (text !== t.text) Object.assign(patch, { text, ex: null, level: '', marks: remap(t.marks, paras(t.text), paras(text)) });
         A.texts.update(t.id, patch); U.edit = false; A.render();
       });
       return;
@@ -132,6 +162,9 @@ ${JSON.stringify(ps)}`;
       const ps = paras(t.text), ex = sanitize(d, ps.length), patch = { ex, level: ex.level || t.level }; if (t.autoTitle && ex.title) patch.title = ex.title;
       A.texts.update(t.id, patch); toast('Explanation saved'); A.render();
     });
+    if ($('editNotes')) $('editNotes').addEventListener('click', () => { U.notes = true; A.render(); $('notesText').focus(); });
+    if ($('cancelNotes')) $('cancelNotes').addEventListener('click', () => { U.notes = false; A.render(); });
+    if ($('saveNotes')) $('saveNotes').addEventListener('click', () => { A.texts.update(t.id, { notes: $('notesText').value.replace(/\r/g, '').trim().slice(0, 20000) }); U.notes = false; toast('Notes saved'); A.render(); });
     $('editText').addEventListener('click', () => { U.edit = true; A.render(); });
     const del = $('delText');
     del.addEventListener('click', () => { if (!del.dataset.armed) { del.dataset.armed = '1'; del.textContent = 'Tap again to delete'; return; } A.texts.remove(t.id); toast('Deleted'); go('mine'); });

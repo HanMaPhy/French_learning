@@ -235,6 +235,13 @@
       const imp = A.importData({ texts: [{ title: 'Avec audio', text: '– Bonjour.\n– Bonsoir.', src: 'book', audio: ' 3. La famille.mp3 ', marks: { 0: [0, 1.5] } }] }); const wa = Object.values(S().texts).find(x => x.title === 'Avec audio'); if (imp !== '1 text added' || !wa || wa.audio !== '3. La famille.mp3' || !wa.marks || wa.marks[0][1] !== 1.5) throw new Error('import ' + imp);
       A.go('listen'); if (!$('[data-go="adictee|' + au.id + '"]') || !$('[data-go="adictee|' + wa.id + '"]')) throw new Error('hub');
       A.go('mine'); if ($$('details.sec').length !== 2 || $$('.drow').length !== 2 || !/♪ recording/.test($('#app').textContent)) throw new Error('groups ' + $$('details.sec').length + ' rows ' + $$('.drow').length);
+      A.go('mytext', { id: au.id }); if (!$('#editNotes') || $('.notes-box')) throw new Error('no notes yet'); $('#editNotes').click(); $('#notesText').value = 'Vocabulaire :\n- **folle de joie** : overjoyed\n- la sœur : sister\n\n## Grammaire\nIl est né hier : passé composé with être.'; $('#saveNotes').click();
+      if ($$('.notes-box h3').length !== 2 || $$('.notes-box li').length !== 2 || !$('.notes-box b') || !/passé composé/.test($('.notes-box p').textContent) || S().texts[au.id].notes.length < 40) throw new Error('notes not rendered: ' + ($('.notes-box') || {}).innerHTML);
+      const impN = A.importData({ texts: [{ title: 'Avec notes', text: '– Allô ?', notes: ' Ma note. ' }] }); const wn = Object.values(S().texts).find(x => x.title === 'Avec notes'); if (!wn || wn.notes !== 'Ma note.') throw new Error('notes import ' + impN); A.texts.remove(wn.id);
+      $('#editText').click(); $('#edText').value = 'AU CAFÉ\n– Salut Christelle !\n– Salut Clara !\n– Je suis folle de joie !'; $('#edSave').click();
+      const m2 = S().texts[au.id].marks; if (!m2 || !m2[1] || m2[1][1] !== 3.5 || m2[2]) throw new Error('a corrected word keeps the mark: ' + JSON.stringify(m2));
+      $('#editText').click(); $('#edText').value = '(Au café.)\nAU CAFÉ\n– Salut Christelle !\n– Salut Clara !'; $('#edSave').click();
+      const m3 = S().texts[au.id].marks; if (!m3 || !m3[2] || m3[2][1] !== 3.5 || m3[1]) throw new Error('a line added above moves the mark: ' + JSON.stringify(m3));
       A.texts.remove(wa.id); A.texts.remove(au.id);
     });
     tryView('review is empty before studying', () => { A.go('review'); if (!/Nothing due/.test($('#app').textContent)) throw new Error($('#app h1').textContent); });
