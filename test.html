@@ -188,6 +188,12 @@
     const rr = A.mine.asReading(S().texts[T.id]); check(rr.text.length === 2 && rr.text[0][1] === 'Nice weather today.' && rr.vocab.length === 1 && rr.text[1][1] === '', 'a stored text maps to the reading shape');
     A.adopt({ v: 2, settings: { rate: 1 } }); check(S().texts[T.id] && S().texts[T.id].title === 'Au marché' && S().settings.rate === 1, 'adopting a saved state that has no texts keeps the texts');
     fresh();
+    const imp1 = A.importData({ app: 'allons-y', texts: [{ title: 'Avis', text: 'Chers locataires,\nL\'eau sera coupée mardi.', src: 'hall', level: 'A2' }, { text: 'Chers locataires,\nL\'eau sera coupée mardi.' }, { text: '   ' }] });
+    const avis = Object.values(S().texts).find(x => x.title === 'Avis'); check(imp1 === '1 text added' && avis && avis.level === 'A2' && avis.src === 'hall', 'a texts-only file adds texts to Mine, once each: ' + imp1);
+    const bk = A.exportData(); check(bk.app === 'allons-y' && bk.state.texts[avis.id] && bk.state.words && bk.state.settings, 'a backup carries progress, settings and texts');
+    const PA = A.mine.parseAnswer; check(PA('{"a":1}').a === 1 && PA('Here it is:\n```json\n{"a":2}\n```').a === 2 && PA('Sure. {"a":3} Hope it helps').a === 3 && PA('nothing') === null, 'a pasted answer is read as JSON, fenced or not');
+    A.texts.remove(avis.id); const withText = JSON.parse(JSON.stringify(bk)); withText.state.settings.rate = 0.77;
+    check(A.importData(withText) === 'Backup restored' && S().settings.rate === 0.77 && S().texts[avis.id] && S().texts[T.id], 'restoring a backup brings its texts back and keeps the ones it lacks'); A.texts.remove(avis.id); fresh();
     check(A.mine.prompt(['Un.', 'Deux.']).includes('exactly 2 strings') && A.mine.prompt(['Un.']).includes('["Un."]'), 'the explanation prompt carries the paragraphs and their count');
 
     log('— views and drills —');
@@ -205,7 +211,7 @@
     tryView('listening hub lists every dictée and the numbers drill', () => { A.go('listen'); if (!$('[data-go="numbers"]')) throw new Error('no numbers button'); if ($$('[data-go^="dictee|"]').length !== 40 + Object.keys(S().texts).length) throw new Error('dictée rows ' + $$('[data-go^="dictee|"]').length); });
     tryView('mine: add by form, open, English toggle, dictée, hub, edit, delete', () => {
       A.go('mine'); $('#newText').value = 'Bonjour tout le monde.\n\nÀ demain !'; $('#newSrc').value = 'a note'; $('#addText').click();
-      if ($$('.para').length !== 2 || !/Bonjour tout le monde\./.test($('#app h1').textContent) || !$('#explain')) throw new Error('form add did not open the text'); const added = Object.values(S().texts).find(x => x.src === 'a note'); if (!added) throw new Error('not stored');
+      if ($$('.para').length !== 2 || !/Bonjour tout le monde\./.test($('#app h1').textContent) || !$('#explain') || !$('#copyPrompt')) throw new Error('form add did not open the text'); $('#pasteAnswer').value = 'Voici : {"title":"Salut","level":"A1","en":["Hello everyone.","See you tomorrow!"],"notes":"Two greetings.","vocab":[["tout le monde","phrase","everyone","Bonjour tout le monde"]],"patterns":[],"idioms":[],"grammar":[]}'; $('#useAnswer').click(); if (!/Salut/.test($('#app h1').textContent) || $$('details.sec#vocab').length !== 1 || $('#explain')) throw new Error('pasted answer not applied'); const added = Object.values(S().texts).find(x => x.src === 'a note'); if (!added) throw new Error('not stored');
       $('#delText').click(); $('#delText').click(); if (S().texts[added.id]) throw new Error('not deleted');
       if ($$('.drow').length !== 1) throw new Error('rows ' + $$('.drow').length); $('.drow').click(); if ($$('.para').length !== 2 || !$('#showEn') || $$('details.sec').length !== 3 || $('#explain')) throw new Error('explained text page'); $('#showEn').click(); if ($$('.para .en').length !== 1) throw new Error('english');
       A.go('dictee', { id: 'mine:' + T.id }); if (!$('#start') || !/my text/.test($('#app').textContent)) throw new Error('no dictée'); A.go('listen'); if (!$('[data-go="dictee|mine:' + T.id + '"]')) throw new Error('hub');

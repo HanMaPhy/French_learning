@@ -31,7 +31,9 @@ Use straight apostrophes, put French fragments inside « » in the English expla
 
 The paragraphs, as a JSON array:
 ${JSON.stringify(ps)}`;
-  A.mine = { asReading, sanitize, prompt };
+  // the answer as an assistant pastes it: the whole text as JSON, else the body of a code fence, else from the first { to the last }
+  const parseAnswer = txt => { const s = String(txt || '').trim(); const tries = [s, (s.match(/```(?:json)?\s*([\s\S]*?)```/) || [])[1], s.slice(s.indexOf('{'), s.lastIndexOf('}') + 1)]; for (const c of tries) { if (!c) continue; try { const v = JSON.parse(c); if (v && typeof v === 'object') return v; } catch (e) { /* next */ } } return null; };
+  A.mine = { asReading, sanitize, prompt, parseAnswer };
 
   const fmtDate = t => new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
   const autoTitle = text => { const p0 = paras(text)[0] || '', mm = p0.match(/^(.*?[.!?…])(\s|$)/), first = mm ? mm[1] : p0; return first.length > 60 ? first.slice(0, 57).replace(/\s+\S*$/, '') + '…' : first; };
@@ -76,7 +78,11 @@ ${JSON.stringify(ps)}`;
     const explain = t.ex ? '' : `<div class="card"><span class="eyebrow">Explain</span>
       <p class="en" style="margin-top:6px">Claude reads the text and writes what the course readings have: a translation of each paragraph, the words worth learning, sentence patterns, idioms and the grammar at work. It runs on your own Claude account; the first time, the page asks your permission.</p>
       <div class="row" style="margin-top:10px"><button class="btn primary" id="explain" ${U.busy ? 'disabled' : ''}>${U.busy ? 'Thinking…' : 'Explain this text'}</button>${U.busy ? '<button class="btn" id="stopExplain">Stop</button>' : ''}<span class="en" id="explainNote">${esc(U.err)}</span></div>
-      <p class="en" style="margin-top:8px;font-size:.9rem">Or read it elsewhere: <a href="https://www.deepl.com/translator#fr/en/${encodeURIComponent(t.text.slice(0, 3000))}" target="_blank" rel="noopener">open in DeepL</a>.</p></div>`;
+      <details class="sec" style="margin-top:12px"><summary><span class="eyebrow">Without Claude</span><span class="en">copy the prompt, paste the answer</span></summary>
+        <p class="en" style="margin-top:8px;font-size:.9rem">Copy the prompt and give it to any assistant you like; paste its JSON answer below and it is kept exactly as if it had been written here. Or just read the text elsewhere: <a href="https://www.deepl.com/translator#fr/en/${encodeURIComponent(t.text.slice(0, 3000))}" target="_blank" rel="noopener">open in DeepL</a>.</p>
+        <div class="row" style="margin-top:8px"><button class="btn" id="copyPrompt">Copy prompt</button><span class="en" id="copyNote" style="font-size:.9rem"></span></div>
+        <textarea class="dict" id="pasteAnswer" placeholder="Paste the JSON answer here…" style="min-height:110px;font-size:.95rem;font-family:var(--font-ui);margin-top:10px" spellcheck="false"></textarea>
+        <div class="actions"><button class="btn primary" id="useAnswer">Use this answer</button></div></details></div>`;
     return head + A.reading.textCard(r, U, { dictee: 'mine:' + t.id }) + explain + (t.ex ? A.reading.notesCards(r) : '')
       + `<div class="card"><div class="row"><span class="eyebrow">This text</span><span class="grow"></span>${t.ex ? `<button class="btn ghost" id="reexplain" ${U.busy ? 'disabled' : ''}>${U.busy ? 'Thinking…' : 'Explain again'}</button>` : ''}<button class="btn ghost" id="editText">Edit</button><button class="btn ghost" id="delText">Delete</button></div>${t.ex && U.err ? `<p class="en" style="margin-top:6px">${esc(U.err)}</p>` : ''}</div>`;
   };
@@ -109,6 +115,16 @@ ${JSON.stringify(ps)}`;
     if ($('explain')) $('explain').addEventListener('click', () => explain(t, false));
     if ($('reexplain')) $('reexplain').addEventListener('click', () => explain(t, true));
     if ($('stopExplain')) $('stopExplain').addEventListener('click', () => { if (ctl) ctl.abort(); });
+    if ($('copyPrompt')) $('copyPrompt').addEventListener('click', () => {
+      const p = prompt(paras(t.text)), note = $('copyNote'), done = () => { note.textContent = 'Copied. Paste it to your assistant.'; };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(p).then(done).catch(() => { $('pasteAnswer').value = p; $('pasteAnswer').select(); note.textContent = 'Copy the prompt from the box below, then clear it for the answer.'; });
+      else { $('pasteAnswer').value = p; $('pasteAnswer').select(); note.textContent = 'Copy the prompt from the box below, then clear it for the answer.'; }
+    });
+    if ($('useAnswer')) $('useAnswer').addEventListener('click', () => {
+      const d = parseAnswer($('pasteAnswer').value); if (!d) { toast('No JSON object found in the pasted text'); return; }
+      const ps = paras(t.text), ex = sanitize(d, ps.length), patch = { ex, level: ex.level || t.level }; if (t.autoTitle && ex.title) patch.title = ex.title;
+      A.texts.update(t.id, patch); toast('Explanation saved'); A.render();
+    });
     $('editText').addEventListener('click', () => { U.edit = true; A.render(); });
     const del = $('delText');
     del.addEventListener('click', () => { if (!del.dataset.armed) { del.dataset.armed = '1'; del.textContent = 'Tap again to delete'; return; } A.texts.remove(t.id); toast('Deleted'); go('mine'); });

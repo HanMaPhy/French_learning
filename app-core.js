@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1'];
-  const BUILD = 9; // bump together with the ?v= on the script tags in index.html whenever the scripts change
+  const BUILD = 10; // bump together with the ?v= on the script tags in index.html whenever the scripts change
 
   // ---------- merge data files into one book ----------
   const BOOK = [];
@@ -87,6 +87,26 @@
     update(id, patch) { const t = S.texts[id]; if (!t) return null; Object.assign(t, patch, { updated: Date.now(), synced: false }); saveLocal(); pushText(t); return t; },
     remove(id) { delete S.texts[id]; saveLocal(); if (dbTexts) dbChain = dbChain.then(() => dbTexts.doc(id).delete()).catch(() => { sync.status = 'error'; }); }
   };
+  // ---------- backup files: everything in one JSON, so progress and texts never depend on any one browser, account or host ----------
+  function exportData() { return { app: 'allons-y', build: BUILD, exported: Date.now(), state: JSON.parse(JSON.stringify(S)) }; }
+  function importData(o) { // a full backup replaces progress and settings and merges texts (newer copy wins); a file holding only texts adds them to Mine
+    if (!o || typeof o !== 'object') throw new Error('not a backup');
+    const st = o.state && typeof o.state === 'object' ? o.state : (o.words && o.settings ? o : null);
+    if (st) {
+      const mine = S.texts || {}; adopt(st); const merged = Object.assign({}, S.texts);
+      Object.values(mine).forEach(t => { const inc = merged[t.id]; if (!inc || (inc.updated || 0) < (t.updated || 0)) merged[t.id] = t; });
+      S.texts = merged; Object.values(S.texts).forEach(t => { t.synced = false; pushText(t); }); save(); render(); return 'Backup restored';
+    }
+    const list = Array.isArray(o.texts) ? o.texts : Array.isArray(o) ? o : null;
+    if (!list) throw new Error('not a backup');
+    const have = new Set(Object.values(S.texts).map(t => norm(t.text).slice(0, 200))); let n = 0;
+    list.forEach(t => {
+      if (!t || typeof t.text !== 'string' || !t.text.trim()) return;
+      const ps = paragraphs(t.text), key = norm(ps.join(' ')).slice(0, 200); if (!ps.length || have.has(key)) return; have.add(key);
+      texts.add({ title: String(t.title || '').trim().slice(0, 80) || ps[0].slice(0, 60), autoTitle: !t.title, text: ps.join('\n'), src: String(t.src || '').slice(0, 80), level: /^(A1|A2|B1|B2|C1)$/.test(t.level) ? t.level : '', ex: t.ex && typeof t.ex === 'object' ? t.ex : null, added: Date.now() - n }); n++;
+    });
+    saveLocal(); render(); return n + ' text' + (n === 1 ? '' : 's') + ' added';
+  }
   const paragraphs = text => String(text || '').replace(/\r/g, '').split('\n').map(s => s.replace(/[\u00a0\u202f]/g, ' ').replace(/[ \t]+/g, ' ').trim()).filter(Boolean);
 
   // ---------- spaced repetition (Leitner boxes 0–5) ----------
@@ -370,6 +390,8 @@
       <div class="row"><button class="btn" id="testVoice">Test voice</button><label class="row" style="gap:6px"><input type="checkbox" id="showEnSel" ${S.settings.showEn ? 'checked' : ''}> Show English in lessons</label></div>
       <div class="field"><label for="fromSel">Start from level</label><select id="fromSel">${LEVELS.map(L => `<option value="${L}" ${(S.settings.minLevel || 'A1') === L ? 'selected' : ''}>${L}${L === 'A1' ? ' (show everything)' : ''}</option>`).join('')}</select><span class="en" style="font-size:.88rem">Levels below this are hidden from the Book, Listening and Review, and their words never come up for review.</span></div>
       <p class="en" style="font-size:.9rem">${syncText} <span class="num" style="color:var(--faint)">· build ${BUILD}</span></p>
+      <div class="field"><label>Backup</label><div class="row"><button class="btn" id="exportBtn">Export everything</button><button class="btn" id="importBtn">Import a file</button><input type="file" id="importFile" accept=".json,application/json" hidden></div>
+        <span class="en" style="font-size:.88rem">Export writes one JSON file with your progress, settings and your own texts: keep it anywhere. Import restores such a backup, or, when the file holds only texts, adds them to Mine.</span></div>
       <div class="row" style="justify-content:space-between"><button class="btn ghost" id="resetBtn" style="color:var(--bad)">Reset all progress</button></div>
     </div>`;
     document.body.appendChild(ov);
@@ -384,13 +406,20 @@
     ov.querySelector('#showEnSel').addEventListener('change', e => { S.settings.showEn = e.target.checked; save(); });
     ov.querySelector('#fromSel').addEventListener('change', e => { S.settings.minLevel = e.target.value; save(); });
     ov.querySelector('#testVoice').addEventListener('click', () => TTS.speak('Bonjour ! Allons-y, apprenons le français ensemble.'));
+    ov.querySelector('#exportBtn').addEventListener('click', () => {
+      const blob = new Blob([JSON.stringify(exportData(), null, 1)], { type: 'application/json' }), a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = 'allons-y-' + new Date().toISOString().slice(0, 10) + '.json'; document.body.appendChild(a); a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); toast('Backup written');
+    });
+    ov.querySelector('#importBtn').addEventListener('click', () => ov.querySelector('#importFile').click());
+    ov.querySelector('#importFile').addEventListener('change', e => { const f = e.target.files[0]; if (!f) return; f.text().then(txt => { const msg = importData(JSON.parse(txt)); close(); toast(msg); }).catch(() => toast('That is not an Allons-y file')); });
     const rb = ov.querySelector('#resetBtn');
     rb.addEventListener('click', () => { if (rb.dataset.armed) { adopt({}); save(); close(); toast('Progress reset'); } else { rb.dataset.armed = '1'; rb.textContent = 'Tap again to confirm reset'; } });
   }
   document.getElementById('settingsBtn').addEventListener('click', openSettings);
 
   // ---------- expose for the drills file ----------
-  window.App = { LEVELS, BOOK, WORDS, LESSONS, LISTEN, READING, texts, paragraphs, visible, VLEVELS, VBOOK, VWORDS, VLISTEN, views, go, render, save, adopt, state: () => S, wstate, rate, practiceResult, dueWords, isDue, TTS, esc, fr, shuffle, pick, norm, speakBtn, toast, boxClass };
+  window.App = { LEVELS, BOOK, WORDS, LESSONS, LISTEN, READING, texts, paragraphs, exportData, importData, visible, VLEVELS, VBOOK, VWORDS, VLISTEN, views, go, render, save, adopt, state: () => S, wstate, rate, practiceResult, dueWords, isDue, TTS, esc, fr, shuffle, pick, norm, speakBtn, toast, boxClass };
   render();
   initDb();
 })();

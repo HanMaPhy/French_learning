@@ -60,6 +60,18 @@ Leitner 盒子 0–5，间隔 0 / 1 / 3 / 7 / 14 / 30 天。
 - 进度按 `课id:headword` 存，所以可以调顺序、加词；别改已有 headword 的拼写，否则那个词的进度会断开。
 - 改完在浏览器里打开 `test.html`，应该显示 ALL PASSED；展开下面的列表可以看每一句挖的是哪个词。
 
+## 独立于 Claude
+
+app 本身是静态文件，不依赖任何服务。三条和 Claude 的耦合都已经能解开：
+
+- **托管**：`python3 build.py` 把 fragment 格式的 `index.html` 包成完整页面写进 `docs/`，并复制脚本和数据。`docs/index.html` 可以直接双击打开；放到 GitHub Pages（Settings → Pages → Deploy from a branch → main，folder `/docs`）、Cloudflare Pages 或任何静态托管都行。每次改代码后重跑 `build.py` 再提交。
+- **数据**：Settings → Backup → Export everything 导出一个 JSON（进度、设置、Mine 里的文本）；Import a file 恢复。文件里只有 `texts` 时按「添加文本」处理，已有的同文本不重复加。
+- **Explain**：Mine 里每条文本的 Explain 卡片下有「Without Claude」：Copy prompt 复制讲解 prompt，交给任何助手，把它返回的 JSON 贴回来，Use this answer 存入，效果与 Claude 在页内写的一样。
+
+## 自己的语料
+
+`french/` 目录放学习资料（书、音频），`.gitignore` 排除，永远不进仓库也不进发布的页面。`python3 tools/extract-library.py` 从其中可读的 PDF 抽出法语正文，写成 Mine 的导入文件到 `library/`（同样不进仓库）：Le Petit Nicolas 各章（切成约 700 词一段）、Le Petit Prince 各章（精听党版，只取左栏法语）、TV5Monde 文章、InnerFrench 播客的 transcript。导入方式：Settings → Import a file → 选 `library/*.json`。需要 `pip install pypdf`。扫描版的书（en Dialogues、Progressive 系列、丁丁）没有文字层，脚本不处理。
+
 ## 发布
 
 线上版本是 Claude Artifact，更新时 publish `index.html`，并把改过的 JS 作为 files 一起发。**每次改了 JS，都要把 `index.html` 里 13 个 `<script src="…?v=N">` 的 N 和 `app-core.js` 开头的 `BUILD` 一起加一**，否则浏览器会继续用缓存里的旧脚本；Settings 底部显示当前跑的是哪个 build。
