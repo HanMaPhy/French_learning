@@ -1,0 +1,8 @@
+# the learner's own corpus (copyrighted books, audio) and anything derived from it stay out of the repository
+french/
+library/
+backups/
+# OS and editor noise
+.DS_Store
+Thumbs.db
+*.swp

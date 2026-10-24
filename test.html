@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Allons-y self-test</title>
+<style>body{font:15px/1.5 system-ui,-apple-system,sans-serif;margin:0;padding:20px;background:#f3f4f7;color:#1a1e2a}h1{font-size:1.3rem;margin:0 0 6px}p{margin:0 0 14px;color:#5f6779}pre{background:#fff;border:1px solid #d6dae3;border-radius:8px;padding:12px;white-space:pre-wrap;font-size:13px;margin:0}pre.ok{border-color:#2f7d4f}pre.ko{border-color:#b63a3a}details{margin-top:14px}summary{cursor:pointer;color:#2a4a9b}#app,#nav,#settingsBtn{position:absolute;left:-9999px;top:0;width:800px}</style></head>
+<body>
+<h1>Allons-y self-test</h1>
+<p>Checks the data files, scans the gap chosen for every sentence, and walks through every view and drill. Speech is muted and your saved progress is put back afterwards.</p>
+<pre id="out">Running…</pre>
+<details><summary>Every cloze gap: word → gap | sentence (a leading ? marks a gap that shares no stem with the headword)</summary><pre id="full"></pre></details>
+<div id="app"></div><nav id="nav"></nav><button id="settingsBtn"></button>
+<script src="data/vocab-a1.js"></script>
+<script src="data/vocab-a1b.js"></script>
+<script src="data/vocab-a2.js"></script>
+<script src="data/vocab-a2b.js"></script>
+<script src="data/vocab-b1.js"></script>
+<script src="data/vocab-b1b.js"></script>
+<script src="data/vocab-b2.js"></script>
+<script src="data/vocab-b2b.js"></script>
+<script src="data/vocab-c1.js"></script>
+<script src="data/vocab-c1b.js"></script>
+<script src="data/listening.js"></script>
+<script src="data/reading-a1.js"></script>
+<script src="data/reading-a2.js"></script>
+<script src="data/reading-b1.js"></script>
+<script src="data/reading-b2.js"></script>
+<script src="data/reading-c1.js"></script>
+<script src="app-core.js"></script>
+<script src="app-listen.js"></script>
+<script src="app-drills.js"></script>
+<script src="app-reading.js"></script>
+<script src="app-mine.js"></script>
+<script>
+(async function () {
+  const L = [], FULL = []; let fails = 0;
+  const log = (...a) => L.push(a.join(' '));
+  const check = (cond, msg) => { if (cond) log('ok    ' + msg); else { fails++; log('FAIL  ' + msg); } };
+  const A = window.App;
+  const $ = s => document.querySelector(s), $$ = s => Array.from(document.querySelectorAll(s));
+  const LS = 'allonsy.state'; let saved = null; try { saved = localStorage.getItem(LS); } catch (e) { /* ignore */ }
+  let spoken = [];
+  try {
+    A.TTS.speak = t => { spoken.push(t); return Promise.resolve(true); }; A.TTS.seq = async () => true; A.TTS.stop = () => {};
+
+    log('— data —');
+    check(A.BOOK.length === 5 && A.BOOK.every(c => c.lessons.length === 6), 'five levels of six lessons (' + A.BOOK.map(c => c.lvl + ':' + c.lessons.length).join(' ') + ')');
+    check(A.WORDS.length === 300, A.WORDS.length + ' words');
+    check(A.WORDS.every(w => w.lesson.words.length === 10), 'every lesson has 10 words');
+    check(A.WORDS.every(w => w.ex.length === 3 && w.ex.every(e => e.fr && e.en) && w.en && w.pos), 'every word has pos, meaning and 3 complete examples');
+    const ids = A.BOOK.flatMap(c => c.lessons.map(l => l.id)); check(new Set(ids).size === ids.length, 'lesson ids are unique');
+    const heads = {}; A.WORDS.forEach(w => { const k = A.norm(w.fr); (heads[k] = heads[k] || []).push(w.key); }); const dupH = Object.values(heads).filter(v => v.length > 1); check(dupH.length === 0, 'headwords are unique' + (dupH.length ? ': ' + dupH.map(v => v.join(' = ')).join('; ') : ''));
+    const keys = A.WORDS.map(w => w.key); check(new Set(keys).size === keys.length, 'progress keys are unique');
+    check(A.LISTEN.length === 10 && A.LISTEN.every(p => p.s.length === p.en.length && p.q.every(q => q.o.length === 4 && q.a >= 0 && q.a < 4)), A.LISTEN.length + ' passages, each with matching translations and 4-option questions');
+
+    log('— cloze gaps over every sentence —');
+    let empty = 0, n = 0, odd = 0;
+    A.WORDS.forEach(w => w.ex.forEach(e => {
+      const g = A.splitBlank(e.fr, A.blankFor(w, e.fr)); n++;
+      if (!g.answer) empty++;
+      const hs = w.fr.split(' / ').map(v => A.norm(v.replace(/^(le |la |les |l'|un |une |des |se |s')/, '')));
+      const ans = A.norm(g.answer.replace(/^(l|d|qu|s|n|j|m|t|c)'/i, ''));
+      const related = hs.some(h => h === ans || h.split(' ').some(p => p.length >= 3 && ans.split(' ').some(a => a.slice(0, 3) === p.slice(0, 3))));
+      if (!related) odd++;
+      FULL.push((related ? '   ' : '?  ') + w.lvl + ' [' + w.fr + '] → "' + g.answer + '" | ' + e.fr);
+    }));
+    check(empty === 0, n + ' sentences scanned, ' + empty + ' empty gaps');
+    log('      ' + odd + ' gaps share no stem with the headword (conjugated and derived forms are expected; see the list below)');
+    check(A.WORDS.every(w => w.ex.every(e => A.tokens(e.fr).every(t => A.norm(t)))), 'rebuild chips never consist of punctuation alone');
+
+    log('— spaced repetition —');
+    const fresh = () => { A.adopt({}); A.state().settings.minLevel = 'A1'; }; fresh(); const S = () => A.state();
+    const k = A.WORDS[0].key;
+    for (let i = 0; i < 5; i++) A.practiceResult(k, true, 3); check(A.wstate(k).b === 3, 'recognition drills lift a word to box 3 and stop there (box ' + A.wstate(k).b + ')');
+    for (let i = 0; i < 5; i++) A.practiceResult(k, true, 5); check(A.wstate(k).b === 5, 'production drills lift it to box 5 (box ' + A.wstate(k).b + ')');
+    A.practiceResult(k, false, 5); check(A.wstate(k).b === 0 && A.isDue(A.WORDS[0]) === false, 'a miss sends it back to box 0, due again in ten minutes');
+    A.adopt({ v: 2, settings: { rate: 1.1 } }); check(A.state().settings.minLevel === 'A2' && A.state().settings.showEn === true && A.state().settings.rate === 1.1, 'defaults fill in settings a saved state lacks (minLevel ' + A.state().settings.minLevel + ')');
+    A.adopt({ v: 1, words: { 'a1-1:0': { b: 2, d: 0, n: 1 } } }); check(S().words['a1-1:bonjour'] && S().words['a1-1:bonjour'].b === 2 && S().v === 2, 'v1 progress (keyed by position) migrates to headword keys');
+    fresh();
+
+    log('— slow reading —');
+    const nzs = s => s.replace(/[\s  ]+/g, ' ').trim(), nw = s => s.split(' ').filter(x => /[\p{L}\p{N}]/u.test(x)).length;
+    const allS = A.WORDS.flatMap(w => w.ex.map(e => e.fr)).concat(A.LISTEN.flatMap(p => p.s));
+    let covered = 0, lonely = 0, groups = 0, longest = 0, hist = {}, whist = {};
+    allS.forEach(s => { const c = A.TTS.chunks(s); if (nzs(c.join(' ')) === nzs(s)) covered++; if (c.some(x => !nw(x))) lonely++; groups += c.length; hist[c.length] = (hist[c.length] || 0) + 1; c.forEach(x => { longest = Math.max(longest, nw(x)); whist[nw(x)] = (whist[nw(x)] || 0) + 1; }); });
+    check(covered === allS.length, allS.length + ' sentences: the breath groups join back to the sentence (' + covered + ')');
+    check(lonely === 0, 'no group is punctuation alone');
+    const long7 = Object.keys(whist).filter(k => k >= 7).reduce((a, k) => a + whist[k], 0);
+    check(long7 / groups < 0.05, long7 + ' of ' + groups + ' groups are seven words or longer (under 5%)');
+    log('      ' + (groups / allS.length).toFixed(2) + ' groups per sentence; groups per sentence ' + Object.keys(hist).sort((a, b) => a - b).map(k => k + ':' + hist[k]).join(' ') + '; words per group ' + Object.keys(whist).sort((a, b) => a - b).map(k => k + ':' + whist[k]).join(' ') + '; longest ' + longest);
+    const cut = s => A.TTS.chunks(s).join(' | ');
+    check(cut("Bonjour madame, qu'est-ce que vous prenez ?") === "Bonjour madame, | qu'est-ce que vous prenez ?", 'cut at the comma, never after two words: ' + cut("Bonjour madame, qu'est-ce que vous prenez ?"));
+    check(cut("Je vais au marché et j'achète des légumes pour le dîner.") === "Je vais au marché | et j'achète des légumes | pour le dîner.", 'cut before "et" and "pour": ' + cut("Je vais au marché et j'achète des légumes pour le dîner."));
+    check(cut('Il est plus grand que moi.') === 'Il est plus grand que moi.' && cut('Je pense que oui.') === 'Je pense que oui.', 'a sentence of six words or fewer stays whole unless it has a comma');
+    check(cut("Je pense que c'est une bonne idée.") === "Je pense | que c'est une bonne idée.", 'seven words: cut before "que" even after two words: ' + cut("Je pense que c'est une bonne idée."));
+    check(cut('Le réchauffement climatique est un vrai problème.') === 'Le réchauffement climatique | est un vrai problème.', 'seven words without a conjunction: subject | verb: ' + cut('Le réchauffement climatique est un vrai problème.'));
+    check(cut('Je suis né en 1998 à Pékin.') === 'Je suis né | en 1998 à Pékin.' && cut('Il y a beaucoup de monde à la gare.') === 'Il y a beaucoup de monde | à la gare.', 'never cut right after a preposition, "beaucoup" or "il y": ' + cut('Je suis né en 1998 à Pékin.') + ' / ' + cut('Il y a beaucoup de monde à la gare.'));
+    check(cut("Les enfants passent trop de temps devant l'écran.") === "Les enfants passent trop de temps | devant l'écran." && cut('Il signe la mise en scène de cette pièce.') === 'Il signe la mise en scène | de cette pièce.', 'fixed expressions "trop de", "mise en scène" stay together: ' + cut("Les enfants passent trop de temps devant l'écran.") + ' / ' + cut('Il signe la mise en scène de cette pièce.'));
+    check(cut('Je suis arrivé il y a deux jours.') === 'Je suis arrivé | il y a deux jours.', 'a clause may start at a subject pronoun: ' + cut('Je suis arrivé il y a deux jours.'));
+    const realSay = A.TTS.say, realGaps = A.TTS.gaps; let said = []; A.TTS.gaps = { clause: 0, group: 0 };
+    A.TTS.say = (txt, r) => { said.push([txt, r]); return Promise.resolve(true); };
+    const okSlow = await A.TTS.play("Bonjour madame, qu'est-ce que vous prenez ?", { slow: true }, A.TTS.token);
+    check(okSlow === true && said.length === 2 && said.every(x => x[1] === A.TTS.slowRate()) && A.TTS.slowRate() <= S().settings.rate - 0.2, 'slow reading speaks each group at ' + A.TTS.slowRate() + '× (normal ' + S().settings.rate + '×)');
+    said = []; A.TTS.say = (txt, r) => { said.push(txt); return Promise.resolve(true); };
+    const okNormal = await A.TTS.play("Bonjour madame, qu'est-ce que vous prenez ?", {}, A.TTS.token);
+    check(okNormal === true && said.length === 1, 'normal reading is one utterance');
+    said = []; const tok = A.TTS.token; A.TTS.say = (txt, r) => { said.push(txt); A.TTS.token++; return Promise.resolve(true); };
+    const okStopped = await A.TTS.play("Je vais au marché et j'achète des légumes pour le dîner.", { slow: true }, tok);
+    check(okStopped === false && said.length === 1, 'stop() ends a slow reading after the current group');
+    A.TTS.say = realSay; A.TTS.gaps = realGaps;
+
+    log('— readings —');
+    const RD = A.READING, rids = Object.keys(RD), lids = Object.keys(A.LESSONS);
+    check(rids.length === 30 && lids.every(id => RD[id]), rids.length + ' readings, one per lesson' + (lids.some(id => !RD[id]) ? ' (missing: ' + lids.filter(id => !RD[id]).join(' ') + ')' : ''));
+    const BOUNDS = { A1: [90, 200], A2: [150, 260], B1: [200, 350], B2: [260, 430], C1: [320, 520] };
+    const STOP = new Set('le la les un une des de du se il elle ils elles on je tu nous vous ne pas au aux et ou en que qui ce est sont avoir etre faire plus moins tres tout toute tous toutes pour par dans sur avec sans'.split(' '));
+    // a headword, glossary word or idiom counts as present when each content word occurs in the text as a stem (verbs lose their ending, so « fermer » finds « fermons »),
+    // as an irregular form (« pleut », « reçoit », prefixed verbs like « parvenir » / « soutenir » through their base), or, for phrases made only of function words, as the phrase itself
+    const IRREG = { etre: 'suis est sommes etes sont etais etait etaient ete', avoir: 'avons avez ont avais avait avaient', aller: 'vais vas allons allez vont allais allait irai ira iront', faire: 'fais fait faisons faites font faisais faisait fera feront', vouloir: 'veux veut voulons voulez veulent voulais voulait voulu voudrais voudrait', pouvoir: 'peux peut pouvons pouvez peuvent pouvais pouvait pourrai pourra pourrons pourront', naitre: 'nais nait nee nes nees', boire: 'bois boit buvons buvez boivent buvais buvait', devoir: 'dois doit devons devez doivent devait devrait', dire: 'dis dit disons dites disent disait', voir: 'vois voit voyons voyez voient voyait verra', savoir: 'sais sait savons savez savent savait saura', recevoir: 'recois recoit recevons recevez recoivent recu recue recevait recevra', pleuvoir: 'pleut pleuvait pleuvra', asseoir: 'assieds assied asseyons asseyez asseyent assis assise', payer: 'paie paies paient paye payes payent payons payez paiera paieront paierai',
+      venir: 'viens vient venons venez viennent venu venue venus venues venais venait venaient viendra viendrai viendras viendrons viendrez viendront vienne', tenir: 'tiens tient tenons tenez tiennent tenu tenue tenus tenues tenais tenait tenaient tiendra tiendrai tiendrons tiendrez tiendront tienne', prendre: 'prends prend prenons prenez prennent pris prise prenais prenait prendra', mettre: 'mets met mettons mettez mettent mis mise mettais mettait mettra' };
+    const BASES = ['venir', 'tenir', 'prendre', 'mettre'];
+    const formsOf = w => { if (IRREG[w]) return IRREG[w].split(' '); const b = BASES.find(x => w.endsWith(x) && w.length > x.length); return b ? IRREG[b].split(' ').map(f => w.slice(0, w.length - b.length) + f) : []; };
+    const strip = s => A.norm(s).replace(/^(le |la |les |l'|un |une |des |se |s')/, '');
+    const SUF = ['aitre', 'ndre', 'aloir', 'oir', 'er', 'ir', 're']; // verb endings dropped for the stem: « reconnaître » → reconn, « rejoindre » → rejoi, « équivaloir » → equiv
+    const stemOf = w => { if (/(er|ir|re)$/.test(w) && w.length >= 5) { const s = SUF.find(x => w.endsWith(x)); return w.slice(0, Math.max(3, w.length - s.length)); } return w.slice(0, w.length >= 6 ? 5 : 4); };
+    const hit = (st, txt) => new RegExp('(^|[^a-z])' + st.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).test(txt);
+    const wordHit = (w, txt) => formsOf(w).filter(f => f.length >= 3).some(f => new RegExp('(^|[^a-z])' + f + '($|[^a-z])').test(txt)) || hit(stemOf(w), txt);
+    const contentWords = s => strip(s).split(' ').filter(w => w.length >= 3 && !STOP.has(w));
+    const tail2 = n => n.split(' ').slice(-2).join(' ');
+    const inText = (phrase, txt) => { const n = strip(phrase), cw = contentWords(n); return cw.length ? cw.some(w => wordHit(w, txt)) : (txt.includes(n) || txt.includes(tail2(n))); };
+    const share = (phrase, txt) => { const n = A.norm(phrase), cw = contentWords(n); return cw.length ? cw.filter(w => wordHit(w, txt)).length / cw.length : (txt.includes(n) || txt.includes(tail2(n)) ? 1 : 0); };
+    const rbad = [], rwords = {};
+    rids.forEach(id => {
+      const r = RD[id], l = A.LESSONS[id]; if (!l) { rbad.push(id + ': no such lesson'); return; }
+      const probs = [];
+      if (!(r.title && r.genre && r.notes && Array.isArray(r.text) && r.text.length >= 3 && r.text.every(p => p.length === 2 && p[0] && p[1]) && [r.vocab, r.patterns, r.idioms, r.grammar].every(Array.isArray))) { rbad.push(id + ': malformed'); return; }
+      const txt = A.norm(r.text.map(p => p[0]).join(' ')), n = A.readingWords(r), [lo, hi] = BOUNDS[l.lvl]; (rwords[l.lvl] = rwords[l.lvl] || []).push(n);
+      if (n < lo || n > hi) probs.push(n + ' words, wanted ' + lo + '–' + hi);
+      if (!(r.vocab.length >= 7 && r.vocab.length <= 13 && r.vocab.every(w => w.length === 4 && w.every(Boolean)))) probs.push('vocab ' + r.vocab.length);
+      if (!(r.patterns.length >= 3 && r.patterns.length <= 5 && r.patterns.every(p => p.length === 3 && p.every(Boolean)))) probs.push('patterns ' + r.patterns.length);
+      if (!(r.idioms.length >= 2 && r.idioms.length <= 5 && r.idioms.every(p => p.length === 3 && p.every(Boolean)))) probs.push('idioms ' + r.idioms.length);
+      if (!(r.grammar.length >= 2 && r.grammar.length <= 4 && r.grammar.every(p => p.length === 3 && p.every(Boolean)))) probs.push('grammar ' + r.grammar.length);
+      const hw = l.words.filter(w => w.fr.split(' / ').some(f => inText(f, txt)));
+      if (hw.length < 6) probs.push('only ' + hw.length + ' headwords used, missing ' + l.words.filter(w => !hw.includes(w)).map(w => w.fr).join(', '));
+      const heads = new Set(l.words.flatMap(w => w.fr.split(' / ').map(strip)));
+      const dupV = r.vocab.filter(w => w[0].split(' / ').some(f => heads.has(strip(f)))); if (dupV.length) probs.push('vocab repeats headwords: ' + dupV.map(w => w[0]).join(', '));
+      const absentV = r.vocab.filter(w => !w[0].split(' / ').some(f => inText(f, txt))); if (absentV.length) probs.push('vocab not in text: ' + absentV.map(w => w[0]).join(', '));
+      const absentI = r.idioms.filter(p => share(p[0], txt) < 0.6); if (absentI.length) probs.push('idioms not in text: ' + absentI.map(p => p[0]).join(' | '));
+      const absentG = r.grammar.filter(p => share(p[2], txt) < 0.5); if (absentG.length) probs.push('grammar examples not in text: ' + absentG.map(p => p[2]).join(' | '));
+      const spoken = [r.title].concat(r.text.map(p => p[0]), r.vocab.map(w => w[0] + ' ' + w[3]), r.patterns.map(p => p[0] + ' ' + p[2]), r.idioms.map(p => p[0]), r.grammar.map(p => p[2])).join('\n');
+      if (/[  \t—’]/.test(spoken)) probs.push('typography: nbsp, tab, em-dash or curly apostrophe in French text');
+      if (probs.length) rbad.push(id + ': ' + probs.join('; '));
+    });
+    check(rbad.length === 0, 'every reading is well-formed, within its level\'s length, reuses 6+ headwords, and its vocabulary, idioms and grammar examples occur in the text' + (rbad.length ? '\n        ' + rbad.join('\n        ') : ''));
+    log('      words per text: ' + Object.keys(rwords).map(L => L + ' ' + Math.min(...rwords[L]) + '–' + Math.max(...rwords[L])).join(' · '));
+    const sn = A.TTS.sentences("Il est huit heures. Léa sort de l'immeuble. « Bonjour madame ! » dit Léa. M. Petit arrive à 10 h. Et vous ?");
+    check(sn.length === 5 && sn[2] === '« Bonjour madame ! » dit Léa.' && sn[3] === 'M. Petit arrive à 10 h.', 'sentence splitter keeps quotes and abbreviations together: ' + sn.join(' | '));
+    check(cut('Elle dit : « Bonjour madame ! Ça va ? »') === 'Elle dit : | « Bonjour madame ! | Ça va ? »', 'an opening quote starts a new breath group: ' + cut('Elle dit : « Bonjour madame ! Ça va ? »'));
+
+    log('— dictation scoring —');
+    const P = A.dictation.phon, same = (a, b) => P(a) === P(b);
+    const eq = [['parlé', 'parler'], ['parlé', 'parlez'], ['parlé', 'parlait'], ['parlé', 'parlaient'], ['parle', 'parlent'], ['parle', 'parles'], ['a', 'à'], ['on', 'ont'], ['ses', 'ces'], ['ses', "c'est"], ['mère', 'mer'], ['mère', 'maire'], ['vin', 'vingt'], ['temps', 'tant'], ['mange', 'mangent'], ['sans', 'cent'], ['les', 'lait'], ['peu', 'peut'], ['faim', 'fin'], ['heures', 'heure'], ["l'école", 'lecole'], ['moment', 'momant']];
+    const ne = [['chat', 'chaud'], ['bon', 'bonne'], ['dessus', 'dessous'], ['de', 'deux'], ['je', "j'ai"], ['pomme', 'bonbon'], ['vous', 'vu'], ['sort', 'sur']];
+    const eqBad = eq.filter(p => !same(p[0], p[1])), neBad = ne.filter(p => same(p[0], p[1]));
+    check(eqBad.length === 0, 'homophones fold to the same sound' + (eqBad.length ? ': ' + eqBad.map(p => p.join('/') + ' → ' + P(p[0]) + '/' + P(p[1])).join(', ') : ''));
+    check(neBad.length === 0, 'different sounds stay different' + (neBad.length ? ': ' + neBad.map(p => p.join('/') + ' → ' + P(p[0])).join(', ') : ''));
+    const C = A.dictation.compare; let r;
+    r = C('Les enfants mangent des pommes.', 'Les enfant mange des pomme'); check(r.score === 2 && r.spell === 3 && r.hear === 0 && !r.right, 'three endings dropped: spelling, not ear (' + A.dictation.summary(r) + ')');
+    r = C('Les enfants mangent des pommes.', 'Les enfants des pommes'); check(r.score === 4 && r.hear === 1 && r.spell === 0, 'a word not written: by ear (' + A.dictation.summary(r) + ')');
+    r = C('Les enfants mangent des pommes.', 'Les enfants mangent des bonbons'); check(r.score === 4 && r.hear === 1 && r.spell === 0, 'a different word: by ear (' + A.dictation.summary(r) + ')');
+    r = C("Je vais à l'école.", 'Je vais à l ecole'); check(r.spell === 1 && r.hear === 0, 'a word split in two: spelling (' + A.dictation.summary(r) + ')');
+    r = C('Il est huit heures.', 'Il est huit heures'); check(r.right && r.hear === 0 && r.spell === 0, 'the exact text is right');
+    r = C('Il est huit heures.', ''); check(!r.right && r.hear === 4 && r.score === 0, 'nothing typed: every word by ear');
+    const NF = A.numbers.numFr, nf = [[0, 'zéro'], [16, 'seize'], [17, 'dix-sept'], [21, 'vingt et un'], [31, 'trente et un'], [70, 'soixante-dix'], [71, 'soixante et onze'], [72, 'soixante-douze'], [80, 'quatre-vingts'], [81, 'quatre-vingt-un'], [90, 'quatre-vingt-dix'], [91, 'quatre-vingt-onze'], [99, 'quatre-vingt-dix-neuf'], [100, 'cent'], [101, 'cent un'], [200, 'deux cents'], [201, 'deux cent un'], [1000, 'mille'], [1995, 'mille neuf cent quatre-vingt-quinze'], [2026, 'deux mille vingt-six'], [80000, 'quatre-vingt mille']];
+    const nfBad = nf.filter(p => NF(p[0]) !== p[1]); check(nfBad.length === 0, 'numbers in words, 0 to 80 000' + (nfBad.length ? ': ' + nfBad.map(p => p[0] + ' → ' + NF(p[0])).join(', ') : ''));
+    const TK = A.numbers.typedKey;
+    check(TK('time', '17h45') === '1745' && TK('time', '17:45') === '1745' && TK('time', '1745') === '1745' && TK('time', '8h') === '0800' && TK('time', 'midi') === '1200', 'typed times: 17h45, 17:45, 1745, 8h, midi');
+    check(TK('price', '32,60') === '3260' && TK('price', '32.6') === '3260' && TK('price', '32€60') === '3260' && TK('price', '3260').split('|').includes('3260') && TK('price', '32').split('|').includes('3200'), 'typed prices: 32,60 · 32.6 · 32€60 · 3260 · 32');
+    check(TK('date', '23/10/2026') === '23102026' && TK('date', '23 octobre 2026') === '23102026' && TK('date', '1er mars') === '0103' && TK('phone', '06.42.18.73.95') === '0642187395' && TK('year', 'en 1995') === '1995', 'typed dates, phone numbers and years');
+    let genBad = null; for (let k = 0; k < 300 && !genBad; k++) { const it = A.numbers.gen[Object.keys(A.numbers.gen)[k % 6]](); if (!A.numbers.accepts(it, A.numbers.answerFor(it))) genBad = it; }
+    check(!genBad, genBad ? 'generated ' + genBad.kind + ' « ' + genBad.say + ' » rejects its own answer ' + A.numbers.answerFor(genBad) : '300 generated items accept their own answer');
+
+    log('— my texts —');
+    const PG = A.paragraphs('Bonjour !\r\n\nÇa va ?   Oui.\n\n\n« Salut »');
+    check(PG.length === 3 && PG[1] === 'Ça va ? Oui.' && PG[0] === 'Bonjour !', 'paragraph splitting: ' + PG.join(' | '));
+    const T = A.texts.add({ title: 'Test', autoTitle: true, text: "Il fait beau aujourd'hui.\nJe vais au marché avec ma sœur.", src: 'test', level: '', ex: null, added: Date.now() });
+    check(S().texts[T.id] && T.id === S().texts[T.id].id && T.updated > 0, 'a text is stored under a fresh id');
+    const ex = A.mine.sanitize({ title: 'Au marché', level: 'A2', intro: 'A note.', en: ['Nice weather today.'], notes: 'Simple.', vocab: [['le marché', 'n.m.', 'market', 'au marché'], ['bad'], ['x', 'y', 'z', 1]], patterns: [['Je vais à [lieu].', 'Going somewhere.', 'Je vais au marché.']], idioms: 'none', grammar: [['Le présent', 'Explanation.', 'Il fait beau.']] }, 2);
+    check(ex.en.length === 2 && ex.en[1] === '' && ex.vocab.length === 1 && ex.idioms.length === 0 && ex.grammar.length === 1 && ex.level === 'A2' && ex.title === 'Au marché', 'an explanation from Claude is reduced to the expected shape');
+    A.texts.update(T.id, { ex, level: ex.level, title: ex.title });
+    const rr = A.mine.asReading(S().texts[T.id]); check(rr.text.length === 2 && rr.text[0][1] === 'Nice weather today.' && rr.vocab.length === 1 && rr.text[1][1] === '', 'a stored text maps to the reading shape');
+    A.adopt({ v: 2, settings: { rate: 1 } }); check(S().texts[T.id] && S().texts[T.id].title === 'Au marché' && S().settings.rate === 1, 'adopting a saved state that has no texts keeps the texts');
+    fresh();
+    check(A.mine.prompt(['Un.', 'Deux.']).includes('exactly 2 strings') && A.mine.prompt(['Un.']).includes('["Un."]'), 'the explanation prompt carries the paragraphs and their count');
+
+    log('— views and drills —');
+    const tryView = (name, fn) => { try { fn(); check(true, name); } catch (e) { check(false, name + ': ' + (e && e.message || e)); } };
+    tryView('book lists 30 lessons', () => { A.go('book'); if ($$('.lesson-row').length !== 30) throw new Error('rows ' + $$('.lesson-row').length); });
+    tryView('lesson shows 10 words and toggles English', () => { A.go('lesson', { id: 'a1-1' }); if ($$('.word').length !== 10) throw new Error('words=' + $$('.word').length); $('#toggleEn').click(); if (!$('.ex .en').hidden) throw new Error('toggle failed'); $('#toggleEn').click(); });
+    tryView('reading: card on the lesson page, paragraphs, English and slow toggles, four sections, mark as read', () => { A.go('lesson', { id: 'a1-1' }); if (!$('.read-card')) throw new Error('no reading card'); $('.read-card').click(); const r = A.READING['a1-1']; if ($$('.para').length !== r.text.length) throw new Error('paragraphs ' + $$('.para').length); if ($$('.para .en').length) throw new Error('English shown by default'); $('#showEn').click(); if ($$('.para .en').length !== r.text.length) throw new Error('English toggle'); $('#slowAll').click(); if ($('#paras').dataset.slow !== '1') throw new Error('slow toggle'); if ($$('details.sec').length !== 4 || $$('.g').length !== r.vocab.length || $$('.note').length !== r.patterns.length + r.idioms.length + r.grammar.length) throw new Error('sections'); $('#markRead').click(); if (!S().read['a1-1']) throw new Error('not marked as read'); A.go('lesson', { id: 'a1-1' }); if (!/read ✓/.test($('.read-card').textContent)) throw new Error('lesson page does not show it as read'); A.go('reading', { id: 'a1-1' }); $('#markRead').click(); if (S().read['a1-1']) throw new Error('unmark failed'); });
+    tryView('dictée: listen, write every sentence, misses classified, best score saved', () => {
+      A.go('dictee', { id: 'reading:a1-1' }); if (!$('#start')) throw new Error('no start button'); $('#start').click();
+      const sents = A.READING['a1-1'].text.flatMap(p => A.TTS.sentences(p[0]));
+      for (let i = 0; i < sents.length; i++) { if (!$('#dict')) throw new Error('no textarea at sentence ' + i); $('#dict').value = i === 0 ? sents[0].replace('heures', 'heure') : i === 1 ? sents[1].replace('sort ', '') : sents[i]; $('#check').click(); if ((i > 1) !== !!$('.result.ok')) throw new Error('sentence ' + i + ' scored: ' + ($('.result') || {}).textContent); $('#next').click(); }
+      const b = S().dictee['reading:a1-1']; if (!b || b.spell !== 1 || b.hear !== 1 || b.score !== b.total - 2) throw new Error('saved ' + JSON.stringify(b)); if (!/%/.test($('.done b').textContent)) throw new Error('no summary'); if ($$('#sents .sent').length !== sents.length) throw new Error('sentence list'); if (!S().stats.dict || S().stats.dict.words < b.total) throw new Error('stats');
+    });
+    tryView('numbers: ten generated items accept their answers, score saved', () => { A.go('numbers'); for (let i = 0; i < 10; i++) { const it = A.numbers.state().items[i]; $('#num').value = A.numbers.answerFor(it); $('#check').click(); if (!$('.result.ok')) throw new Error(it.kind + ' « ' + it.say + ' » rejected ' + A.numbers.answerFor(it)); $('#next').click(); } if (!/10\/10/.test($('.done b').textContent)) throw new Error($('.done').textContent); if (S().stats.numbers.ok < 10) throw new Error('stats'); });
+    tryView('listening hub lists every dictée and the numbers drill', () => { A.go('listen'); if (!$('[data-go="numbers"]')) throw new Error('no numbers button'); if ($$('[data-go^="dictee|"]').length !== 40 + Object.keys(S().texts).length) throw new Error('dictée rows ' + $$('[data-go^="dictee|"]').length); });
+    tryView('mine: add by form, open, English toggle, dictée, hub, edit, delete', () => {
+      A.go('mine'); $('#newText').value = 'Bonjour tout le monde.\n\nÀ demain !'; $('#newSrc').value = 'a note'; $('#addText').click();
+      if ($$('.para').length !== 2 || !/Bonjour tout le monde\./.test($('#app h1').textContent) || !$('#explain')) throw new Error('form add did not open the text'); const added = Object.values(S().texts).find(x => x.src === 'a note'); if (!added) throw new Error('not stored');
+      $('#delText').click(); $('#delText').click(); if (S().texts[added.id]) throw new Error('not deleted');
+      if ($$('.drow').length !== 1) throw new Error('rows ' + $$('.drow').length); $('.drow').click(); if ($$('.para').length !== 2 || !$('#showEn') || $$('details.sec').length !== 3 || $('#explain')) throw new Error('explained text page'); $('#showEn').click(); if ($$('.para .en').length !== 1) throw new Error('english');
+      A.go('dictee', { id: 'mine:' + T.id }); if (!$('#start') || !/my text/.test($('#app').textContent)) throw new Error('no dictée'); A.go('listen'); if (!$('[data-go="dictee|mine:' + T.id + '"]')) throw new Error('hub');
+      A.go('mytext', { id: T.id }); $('#editText').click(); $('#edTitle').value = 'Nouveau titre'; $('#edSave').click(); if (S().texts[T.id].title !== 'Nouveau titre' || !S().texts[T.id].ex) throw new Error('a title edit must keep the explanation');
+      $('#editText').click(); $('#edText').value = 'Un autre texte.'; $('#edSave').click(); if (S().texts[T.id].ex || !$('#explain')) throw new Error('a text change must drop the explanation');
+      $('#delText').click(); $('#delText').click(); if (S().texts[T.id]) throw new Error('not deleted'); if (!/Nothing here yet/.test($('#app').textContent)) throw new Error('list not empty');
+    });
+    tryView('review is empty before studying', () => { A.go('review'); if (!/Nothing due/.test($('#app').textContent)) throw new Error($('#app h1').textContent); });
+    tryView('listening lists every passage', () => { A.go('listen'); if ($$('.passage-row').length !== A.LISTEN.length) throw new Error('rows'); });
+    tryView('passage: transcript, questions, score saved, slow toggle', () => { A.go('passage', { id: 'l-a1-1' }); $('#showText').click(); if ($$('.sent .fr').length !== 6) throw new Error('sentences'); $('#slowAll').click(); if ($('#sents').dataset.slow !== '1' || $('#slowAll').getAttribute('aria-pressed') !== 'true') throw new Error('slow toggle'); $('#slowAll').click(); if ($('#sents').dataset.slow) throw new Error('slow toggle off'); const p = A.LISTEN[0]; p.q.forEach((q, qi) => $(`[data-q="${qi}"][data-o="${q.a}"]`).click()); $('#checkQ').click(); if (!/3\/3 correct/.test($('#app').textContent)) throw new Error($('.result').textContent); if (!S().listen['l-a1-1']) throw new Error('not saved'); });
+    tryView('flashcards: 10 cards rated Good', () => { A.go('drill', { mode: 'cards', lesson: 'a1-1', from: 'book' }); for (let i = 0; i < 10; i++) { $('#reveal').click(); $('[data-grade="2"]').click(); } if (!/10\/10/.test($('.done b').textContent)) throw new Error($('.done').textContent); });
+    const nz = s => s.replace(/[  ]/g, ' ').replace(/\s+/g, ' ').trim();
+    const answerFor = lid => { const prompt = nz($('.prompt').textContent); let ans = null; A.LESSONS[lid].words.forEach(w => w.ex.forEach(e => { const g = A.splitBlank(e.fr, A.blankFor(w, e.fr)); if (nz(g.before + ' ' + g.tail) === prompt) ans = g.answer; })); return ans; };
+    let caseLeaks = 0, badSets = 0, clozeItems = 0, leak = '';
+    tryView('fill the gap: every lesson, 4 distinct choices in the answer\'s case, correct answer accepted', () => {
+      Object.keys(A.LESSONS).forEach(lid => { A.go('drill', { mode: 'cloze', lesson: lid, from: 'book' }); for (let i = 0; i < 10; i++) { const ans = answerFor(lid); if (!ans) throw new Error('could not locate the answer for "' + $('.prompt').textContent + '"'); const ch = $$('[data-ans]').map(b => b.dataset.ans); clozeItems++; if (new Set(ch.map(A.norm)).size !== 4 || ch.some(c => !c)) badSets++; const cap = /^\p{Lu}/u.test(ans); if (ch.some(c => /^\p{Lu}/u.test(c) !== cap)) { caseLeaks++; leak = leak || (lid + ' answer "' + ans + '" choices: ' + ch.join(' / ')); } const btn = $$('[data-ans]').find(b => b.dataset.ans === ans); if (!btn) throw new Error('no choice for ' + ans); btn.click(); if (!$('.result.ok')) throw new Error('correct answer "' + ans + '" marked wrong'); $('#next').click(); } });
+      if (badSets) throw new Error(badSets + ' choice sets with fewer than 4 distinct options'); if (caseLeaks) throw new Error(caseLeaks + ' choice sets where capitalisation gives the answer away, e.g. ' + leak);
+    });
+    log('      ' + clozeItems + ' cloze items checked');
+    tryView('rebuild: chips rebuild the sentence, punctuation attached', () => { A.go('drill', { mode: 'rebuild', lesson: 'a1-1', from: 'book' }); for (let i = 0; i < 10; i++) { spoken = []; $('#hear').click(); const fr = spoken[0]; for (const tok of A.tokens(fr)) { const chip = $$('#bank [data-build]').find(c => c.textContent === tok); if (!chip) throw new Error('no chip for "' + tok + '"'); chip.click(); } $('#check').click(); if (!$('.result.ok')) throw new Error('"' + fr + '" not accepted'); $('#next').click(); } });
+    tryView('dictation: exact text accepted, LCS diff for a miss', () => { A.go('drill', { mode: 'dictation', lesson: 'a1-3', from: 'book' }); for (let i = 0; i < 10; i++) { const fr = spoken[spoken.length - 1]; if (i === 0) { $('#dict').value = fr.split(' ').slice(1).join(' ') + ' zut'; $('#check').click(); if (!$('.diff .miss') || !$('.diff .extra')) throw new Error('diff did not mark the missing and extra words'); $('#next').click(); continue; } $('#dict').value = fr; $('#check').click(); if (!$('.result.ok')) throw new Error('"' + fr + '" not accepted'); $('#next').click(); } });
+    tryView('EN → FR: reveal and self-grade', () => { A.go('drill', { mode: 'translate', lesson: 'a1-4', from: 'book' }); for (let i = 0; i < 10; i++) { $('#reveal').click(); $('[data-grade="2"]').click(); } if (!/10\/10/.test($('.done b').textContent)) throw new Error($('.done').textContent); });
+    tryView('listen & pick: the spoken sentence\'s meaning is accepted', () => { A.go('drill', { mode: 'listenpick', lesson: 'a1-5', from: 'book' }); for (let i = 0; i < 10; i++) { const fr = spoken[spoken.length - 1]; let en = null; A.WORDS.forEach(w => w.ex.forEach(e => { if (e.fr === fr) en = e.en; })); const btn = $$('[data-ans]').find(b => b.dataset.ans === en); if (!btn) throw new Error('no choice for "' + en + '"'); btn.click(); if (!$('.result.ok')) throw new Error('marked wrong'); $('#next').click(); } });
+    tryView('level drill from the Listening page', () => { A.go('drill', { mode: 'listenpick', lvl: 'B2', from: 'listen' }); if (!/1\/12/.test($('.drill-head .en').textContent)) throw new Error($('.drill-head').textContent); });
+    tryView('drills promote words: the known count rises without flashcards', () => { A.go('book'); const known = parseInt($$('.stat b')[0].textContent, 10); if (!(known > 0)) throw new Error('known = ' + known); log('      book now shows ' + $$('.stat').map(s => s.textContent.replace(/\s+/g, ' ').trim()).join(' · ')); });
+    tryView('review: due words come back', () => { Object.keys(S().words).slice(0, 5).forEach(kk => { S().words[kk].d = 0; }); A.go('review'); if (!/5 words due/.test($('#app h1').textContent)) throw new Error($('#app h1').textContent); A.go('drill', { mode: 'cards', due: true, from: 'review' }); if (!/1\/5/.test($('.drill-head .en').textContent)) throw new Error($('.drill-head').textContent); });
+    tryView('start-from level hides lower levels everywhere', () => { S().settings.minLevel = 'B1'; A.go('book'); if ($$('.lesson-row').length !== 18) throw new Error('rows ' + $$('.lesson-row').length); if (!/180/.test($$('.stat')[0].textContent)) throw new Error($$('.stat')[0].textContent); if (!/A1, A2 are hidden/.test($('#app').textContent)) throw new Error('no hidden-levels note'); A.go('listen'); if ($$('.passage-row').length !== 6) throw new Error('passages ' + $$('.passage-row').length); S().words[A.WORDS[0].key] = { b: 1, d: 0, n: 1 }; if (A.dueWords().some(w => w.lvl === 'A1')) throw new Error('a hidden level is still due'); S().settings.minLevel = 'A1'; });
+    tryView('mark lesson as known, then reset it', () => { A.go('lesson', { id: 'a2-1' }); $('#knowAll').click(); $('#knowAll').click(); const l = A.LESSONS['a2-1']; if (!l.words.every(w => A.wstate(w.key).b === 5)) throw new Error('not all in box 5'); $('#resetLesson').click(); $('#resetLesson').click(); if (!l.words.every(w => A.wstate(w.key).n === 0)) throw new Error('not reset'); });
+    tryView('progress is written to localStorage', () => { const raw = JSON.parse(localStorage.getItem(LS)); if (!raw || Object.keys(raw.words).length < 50) throw new Error('saved words: ' + (raw && Object.keys(raw.words).length)); });
+  } catch (e) { fails++; log('FATAL ' + (e && e.stack || e)); }
+  finally { try { if (saved === null) localStorage.removeItem(LS); else localStorage.setItem(LS, saved); sessionStorage.removeItem('allonsy.view'); } catch (e) { /* ignore */ } }
+  const out = document.getElementById('out'); out.className = fails ? 'ko' : 'ok';
+  out.textContent = (fails ? 'FAILED — ' + fails + ' check' + (fails > 1 ? 's' : '') : 'ALL PASSED') + '\n\n' + L.join('\n');
+  document.getElementById('full').textContent = FULL.join('\n');
+})();
+</script>
+</body></html>
