@@ -42,13 +42,17 @@ ${JSON.stringify(ps)}`;
   let draft = { text: '', src: '' }; // survives a re-render (the account sync renders once when it arrives)
   views.mine = () => {
     const S = A.state(), list = Object.values(S.texts).sort((a, b) => b.added - a.added);
-    const row = t => { const b = S.dictee['mine:' + t.id], n = A.reading.words(asReading(t)); return `<button class="drow" data-go="mytext|${t.id}"><span><span class="t fr" style="font-size:1.1rem">${fr(t.title)}</span><br><span class="sub en">${n} words · ${fmtDate(t.added)}${t.src ? ' · ' + esc(t.src) : ''}${t.level ? ' · ' + esc(t.level) : ''}</span></span><span class="pill num" style="${b ? (b.score === b.total ? 'background:var(--good-soft);color:var(--good)' : 'background:var(--warn-soft);color:var(--warn)') : t.ex ? 'background:var(--accent-soft);color:var(--accent)' : ''}">${b ? 'dictée ' + Math.round(100 * b.score / b.total) + '%' : t.ex ? 'explained' : 'new'}</span></button>`; };
+    const row = t => { const b = S.dictee['audio:' + t.id] || S.dictee['mine:' + t.id], n = A.reading.words(asReading(t)); return `<button class="drow" data-go="mytext|${t.id}"><span><span class="t fr" style="font-size:1.1rem">${fr(t.title)}</span><br><span class="sub en">${n} words · ${fmtDate(t.added)}${t.src ? ' · ' + esc(t.src) : ''}${t.level ? ' · ' + esc(t.level) : ''}${t.audio ? ' · ♪ recording' : ''}</span></span><span class="pill num" style="${b ? (b.score === b.total ? 'background:var(--good-soft);color:var(--good)' : 'background:var(--warn-soft);color:var(--warn)') : t.ex ? 'background:var(--accent-soft);color:var(--accent)' : ''}">${b ? 'dictée ' + Math.round(100 * b.score / b.total) + '%' : t.ex ? 'explained' : 'new'}</span></button>`; };
+    // grouped by source once there is more than one: a course book's dialogues stay together; the group touched last opens
+    const groups = {}; list.forEach(t => { const g = t.src || 'Pasted'; (groups[g] = groups[g] || []).push(t); });
+    const last = g => Math.max(0, ...groups[g].map(t => t.updated || 0)), names = Object.keys(groups).sort((a, b) => last(b) - last(a));
+    const body = names.length > 1 ? names.map((g, k) => `<details class="sec" style="margin-top:10px" ${k === 0 ? 'open' : ''}><summary><span class="fr" style="font-weight:600">${esc(g)}</span><span class="en">${groups[g].length} text${groups[g].length > 1 ? 's' : ''}</span></summary><div class="lessons" style="margin-top:10px">${groups[g].map(row).join('')}</div></details>`).join('') : `<div class="lessons" style="margin-top:10px">${list.map(row).join('')}</div>`;
     return `<div class="lesson-head"><span class="eyebrow">Mine</span><h1>Your own texts</h1>
       <p class="en">French you meet in daily life: a message, a notice, a paragraph from an article. Paste it here and it is kept with your account. Open a text to hear it sentence by sentence, have Claude explain it the way the course readings are explained, and run it as a dictée.</p></div>
     <div class="card"><span class="eyebrow">Add a text</span>
       <textarea class="dict" id="newText" placeholder="Collez le texte ici…" style="min-height:140px;font-size:1.05rem;margin-top:8px" autocapitalize="off" spellcheck="false">${esc(draft.text)}</textarea>
       <div class="row" style="margin-top:10px"><input class="dict" id="newSrc" type="text" placeholder="Where it is from (optional)" value="${esc(draft.src)}" style="margin-top:0;flex:1 1 200px;font-size:1rem" autocomplete="off"><button class="btn primary" id="addText">Save</button></div></div>
-    ${list.length ? `<div class="card"><span class="eyebrow">${list.length} text${list.length > 1 ? 's' : ''}</span><div class="lessons" style="margin-top:10px">${list.map(row).join('')}</div></div>` : '<div class="card"><p class="en">Nothing here yet. The first text you save appears below the form.</p></div>'}`;
+    ${list.length ? `<div class="card"><span class="eyebrow">${list.length} text${list.length > 1 ? 's' : ''}</span>${body}</div>` : '<div class="card"><p class="en">Nothing here yet. The first text you save appears below the form.</p></div>'}`;
   };
   views.mine.after = () => {
     const ta = $('newText'), src = $('newSrc');
@@ -73,6 +77,7 @@ ${JSON.stringify(ps)}`;
       <input class="dict" id="edTitle" type="text" value="${esc(t.title)}" placeholder="Title" style="font-size:1.05rem">
       <textarea class="dict" id="edText" style="min-height:200px;font-size:1.05rem;margin-top:10px" autocapitalize="off" spellcheck="false">${esc(t.text)}</textarea>
       <input class="dict" id="edSrc" type="text" value="${esc(t.src || '')}" placeholder="Where it is from (optional)" style="font-size:1rem">
+      <input class="dict" id="edAudio" type="text" value="${esc(t.audio || '')}" placeholder="Recording: a file name such as 12. Le travail 1.mp3 (optional)" style="font-size:1rem" autocomplete="off">
       <p class="en" style="margin-top:8px;font-size:.9rem">${t.ex ? 'Changing the text itself removes its explanation; the title and source can change freely.' : ''}</p>
       <div class="actions"><button class="btn" id="edCancel">Cancel</button><button class="btn primary" id="edSave">Save</button></div></div>`;
     const explain = t.ex ? '' : `<div class="card"><span class="eyebrow">Explain</span>
@@ -83,7 +88,8 @@ ${JSON.stringify(ps)}`;
         <div class="row" style="margin-top:8px"><button class="btn" id="copyPrompt">Copy prompt</button><span class="en" id="copyNote" style="font-size:.9rem"></span></div>
         <textarea class="dict" id="pasteAnswer" placeholder="Paste the JSON answer here…" style="min-height:110px;font-size:.95rem;font-family:var(--font-ui);margin-top:10px" spellcheck="false"></textarea>
         <div class="actions"><button class="btn primary" id="useAnswer">Use this answer</button></div></details></div>`;
-    return head + A.reading.textCard(r, U, { dictee: 'mine:' + t.id }) + explain + (t.ex ? A.reading.notesCards(r) : '')
+    const audio = t.audio ? A.audio.card(t.audio, { buttons: `<button class="btn" data-go="adictee|${t.id}">Dictée from the recording</button>` }) : '';
+    return head + audio + A.reading.textCard(r, U, { dictee: 'mine:' + t.id }) + explain + (t.ex ? A.reading.notesCards(r) : '')
       + `<div class="card"><div class="row"><span class="eyebrow">This text</span><span class="grow"></span>${t.ex ? `<button class="btn ghost" id="reexplain" ${U.busy ? 'disabled' : ''}>${U.busy ? 'Thinking…' : 'Explain again'}</button>` : ''}<button class="btn ghost" id="editText">Edit</button><button class="btn ghost" id="delText">Delete</button></div>${t.ex && U.err ? `<p class="en" style="margin-top:6px">${esc(U.err)}</p>` : ''}</div>`;
   };
   const COPY = { not_granted: 'You did not allow this page to use Claude. Allow it from the page\'s Permissions menu and try again.', sampling_disabled: 'Claude is not available on this account.', rate_limited: 'Claude is busy or your usage limit is reached: try again in a little while.', session_expired: 'Please sign in to claude.ai again.', refused: 'Claude declined to explain this text.', invalid_json: 'The answer could not be read: try once more, or shorten the text.', prompt_too_large: 'This text is too long for one explanation: split it in two.', empty_completion: 'Claude gave no answer: try once more.', cancelled: '' };
@@ -106,12 +112,13 @@ ${JSON.stringify(ps)}`;
       $('edSave').addEventListener('click', () => {
         const text = paras($('edText').value).join('\n'), title = $('edTitle').value.trim().slice(0, 80) || autoTitle(text), src = $('edSrc').value.trim().slice(0, 80);
         if (!text) { toast('The text cannot be empty'); return; }
-        const patch = { title, src, autoTitle: title === t.title ? t.autoTitle : false }; if (text !== t.text) Object.assign(patch, { text, ex: null, level: '' });
+        const patch = { title, src, audio: $('edAudio').value.trim().slice(0, 120), autoTitle: title === t.title ? t.autoTitle : false }; if (text !== t.text) Object.assign(patch, { text, ex: null, level: '' });
         A.texts.update(t.id, patch); U.edit = false; A.render();
       });
       return;
     }
     A.reading.wirePlayer(asReading(t), U, A.render);
+    if (t.audio) A.audio.wire(t.audio);
     if ($('explain')) $('explain').addEventListener('click', () => explain(t, false));
     if ($('reexplain')) $('reexplain').addEventListener('click', () => explain(t, true));
     if ($('stopExplain')) $('stopExplain').addEventListener('click', () => { if (ctl) ctl.abort(); });

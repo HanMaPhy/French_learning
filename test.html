@@ -27,6 +27,7 @@
 <script src="app-listen.js"></script>
 <script src="app-drills.js"></script>
 <script src="app-reading.js"></script>
+<script src="app-audio.js"></script>
 <script src="app-mine.js"></script>
 <script>
 (async function () {
@@ -218,6 +219,23 @@
       A.go('mytext', { id: T.id }); $('#editText').click(); $('#edTitle').value = 'Nouveau titre'; $('#edSave').click(); if (S().texts[T.id].title !== 'Nouveau titre' || !S().texts[T.id].ex) throw new Error('a title edit must keep the explanation');
       $('#editText').click(); $('#edText').value = 'Un autre texte.'; $('#edSave').click(); if (S().texts[T.id].ex || !$('#explain')) throw new Error('a text change must drop the explanation');
       $('#delText').click(); $('#delText').click(); if (S().texts[T.id]) throw new Error('not deleted'); if (!/Nothing here yet/.test($('#app').textContent)) throw new Error('list not empty');
+    });
+    tryView('audio: files matched by stem, recording card, dictée from the recording with marks, hub row, grouped list', () => {
+      const K = A.audio.key; if (K('L_identite.MP3') !== 'l_identite' || K('1. Chapitre 1, La Correction.wma') !== '1. chapitre 1, la correction' || K('Lec\u0327on 1.mp3') !== K('Leçon 1.mp3')) throw new Error('key: ' + K('L_identite.MP3'));
+      const n = A.audio.adopt([new File([new Uint8Array(64)], 'Leçon 1.mp3'), new File(['x'], 'notes.txt')]); if (n !== 1 || !A.audio.have('Leçon 1.mp3') || !A.audio.have('leçon 1.m4a') || A.audio.have('Leçon 2.mp3')) throw new Error('adopt ' + n);
+      const au = A.texts.add({ title: 'Au café', autoTitle: false, text: 'AU CAFÉ\n– Salut Christelle !\n– Salut Clara !\n– Je suis folle de joie.', src: 'Civilisation A1', level: 'A1', ex: null, added: Date.now(), audio: 'Leçon 2.mp3' });
+      A.go('mytext', { id: au.id }); if (!$('#audBar') || !$('#audPickDir') || $('#audPlay')) throw new Error('a missing recording must offer the folder picker');
+      A.texts.update(au.id, { audio: 'Leçon 1.mp3' }); A.go('mytext', { id: au.id }); if (!$('#audPlay') || !$('#audA') || !$('[data-go="adictee|' + au.id + '"]')) throw new Error('recording card');
+      if (A.audio.turns(S().texts[au.id]).length !== 3) throw new Error('turns ' + A.audio.turns(S().texts[au.id]).length);
+      A.go('adictee', { id: au.id }); if (!$('#start') || $('#start').disabled) throw new Error('no start'); $('#start').click();
+      const ts = ['– Salut Christelle !', '– Salut Clara !', '– Je suis folle de joie.'];
+      for (let i = 0; i < 3; i++) { if (!$('#dict')) throw new Error('no textarea at turn ' + i); $('#dict').value = i === 1 ? 'Salut Clara' : i === 2 ? 'Je suis fol de joie' : ts[i]; $('#check').click(); if ((i !== 2) !== !!$('.result.ok')) throw new Error('turn ' + i + ' scored ' + ($('.result') || {}).textContent); if (i === 0) A.audio.region([1.25, 3.5]); $('#next').click(); }
+      const mk = S().texts[au.id].marks; if (!mk || !mk[1] || mk[1][0] !== 1.3 || mk[1][1] !== 3.5 || mk[2]) throw new Error('marks ' + JSON.stringify(mk));
+      const b = S().dictee['audio:' + au.id]; if (!b || b.total !== 9 || b.score !== 8 || b.spell !== 1 || b.hear !== 0 || !/%/.test($('.done b').textContent) || $$('#sents .sent').length !== 3 || $$('#sents [data-seg]').length !== 1) throw new Error('done ' + JSON.stringify(b));
+      const imp = A.importData({ texts: [{ title: 'Avec audio', text: '– Bonjour.\n– Bonsoir.', src: 'book', audio: ' 3. La famille.mp3 ', marks: { 0: [0, 1.5] } }] }); const wa = Object.values(S().texts).find(x => x.title === 'Avec audio'); if (imp !== '1 text added' || !wa || wa.audio !== '3. La famille.mp3' || !wa.marks || wa.marks[0][1] !== 1.5) throw new Error('import ' + imp);
+      A.go('listen'); if (!$('[data-go="adictee|' + au.id + '"]') || !$('[data-go="adictee|' + wa.id + '"]')) throw new Error('hub');
+      A.go('mine'); if ($$('details.sec').length !== 2 || $$('.drow').length !== 2 || !/♪ recording/.test($('#app').textContent)) throw new Error('groups ' + $$('details.sec').length + ' rows ' + $$('.drow').length);
+      A.texts.remove(wa.id); A.texts.remove(au.id);
     });
     tryView('review is empty before studying', () => { A.go('review'); if (!/Nothing due/.test($('#app').textContent)) throw new Error($('#app h1').textContent); });
     tryView('listening lists every passage', () => { A.go('listen'); if ($$('.passage-row').length !== A.LISTEN.length) throw new Error('rows'); });
