@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1'];
-  const BUILD = 14; // bump together with the ?v= on the script tags in index.html whenever the scripts change
+  const BUILD = 15; // bump together with the ?v= on the script tags in index.html whenever the scripts change
 
   // ---------- merge data files into one book ----------
   const BOOK = [];
@@ -35,10 +35,11 @@
     const d = DEFAULT(), src = JSON.parse(JSON.stringify(o || {})), keepTexts = S ? S.texts : null;
     S = Object.assign(d, src, { settings: Object.assign(d.settings, src.settings || {}) });
     S.texts = src.texts || keepTexts || {}; // the learner's own texts live in their own documents, never in the state document S.words = S.words || {}; S.listen = S.listen || {}; S.read = S.read || {}; S.dictee = S.dictee || {}; S.stats = S.stats || {};
-    if ((S.v || 1) < 2) { // v1 keyed a word by its position in the lesson; v2 keys it by headword, so reordering a data file keeps progress
-      const m = {}; Object.entries(S.words).forEach(([k, st]) => { const i = k.lastIndexOf(':'), l = LESSONS[k.slice(0, i)], wi = k.slice(i + 1); const w = l && /^\d+$/.test(wi) ? l.words[+wi] : null; m[w ? w.key : k] = st; }); S.words = m; S.v = 2;
-    }
+    if ((S.v || 1) < 2) { S.words = migrate(S.words); S.v = 2; }
   }
+  const migrate = words => { // v1 keyed a word by its position in the lesson; v2 keys it by headword, so reordering a data file keeps progress
+    const m = {}; Object.entries(words || {}).forEach(([k, st]) => { const i = k.lastIndexOf(':'), l = LESSONS[k.slice(0, i)], wi = k.slice(i + 1); const w = l && /^\d+$/.test(wi) ? l.words[+wi] : null; m[w ? w.key : k] = st; }); return m;
+  };
   try { const raw = localStorage.getItem(LS_KEY); if (raw) adopt(JSON.parse(raw)); } catch (e) { /* storage unavailable */ }
 
   let saveTimer = null, dbRef = null, dbTexts = null, dbChain = Promise.resolve();
@@ -89,25 +90,54 @@
   };
   // ---------- backup files: everything in one JSON, so progress and texts never depend on any one browser, account or host ----------
   function exportData() { return { app: 'allons-y', build: BUILD, exported: Date.now(), state: JSON.parse(JSON.stringify(S)) }; }
-  function importData(o) { // a full backup replaces progress and settings and merges texts (newer copy wins); a file holding only texts adds them to Mine
+  function importData(o, replace) { // a full backup is merged into this device's progress (or replaces it when asked); a file holding only texts adds them to Mine
     if (!o || typeof o !== 'object') throw new Error('not a backup');
     const st = o.state && typeof o.state === 'object' ? o.state : (o.words && o.settings ? o : null);
     if (st) {
+      if (!replace) { const msg = mergeState(st); save(); render(); return msg; }
       const mine = S.texts || {}; adopt(st); const merged = Object.assign({}, S.texts);
       Object.values(mine).forEach(t => { const inc = merged[t.id]; if (!inc || (inc.updated || 0) < (t.updated || 0)) merged[t.id] = t; });
       S.texts = merged; Object.values(S.texts).forEach(t => { t.synced = false; pushText(t); }); save(); render(); return 'Backup restored';
     }
     const list = Array.isArray(o.texts) ? o.texts : Array.isArray(o) ? o : null;
     if (!list) throw new Error('not a backup');
-    const have = new Set(Object.values(S.texts).map(t => norm(t.text).slice(0, 200))); let n = 0;
-    list.forEach(t => {
-      if (!t || typeof t.text !== 'string' || !t.text.trim()) return;
-      const ps = paragraphs(t.text), key = norm(ps.join(' ')).slice(0, 200); if (!ps.length || have.has(key)) return; have.add(key);
-      const nt = { title: String(t.title || '').trim().slice(0, 80) || ps[0].slice(0, 60), autoTitle: !t.title, text: ps.join('\n'), src: String(t.src || '').slice(0, 80), level: /^(A1|A2|B1|B2|C1)$/.test(t.level) ? t.level : '', ex: t.ex && typeof t.ex === 'object' ? t.ex : null, added: Date.now() - n, audio: typeof t.audio === 'string' ? t.audio.trim().slice(0, 120) : '', notes: typeof t.notes === 'string' ? t.notes.trim().slice(0, 20000) : '' };
-      if (t.marks && typeof t.marks === 'object' && !Array.isArray(t.marks)) nt.marks = t.marks; // a recording's turn boundaries (see app-audio.js)
-      texts.add(nt); n++;
-    });
-    saveLocal(); render(); return n + ' text' + (n === 1 ? '' : 's') + ' added';
+    const n = addTexts(list); saveLocal(); render(); return n + ' text' + (n === 1 ? '' : 's') + ' added';
+  }
+  // Merging two devices' progress. The rule is idempotent and symmetric, so a backup can travel phone → computer → phone without drifting:
+  // for a word, the more recently reviewed copy wins (the due date minus the box's interval says when it was last seen), ties to the higher box,
+  // and the attempt count is the larger; best scores are kept; counters take the larger value; a text is taken when its last edit is newer.
+  const lastSeen = w => (w.d || 0) - INTERVALS[Math.min(5, Math.max(0, w.b || 0))] * DAY;
+  function mergeState(st) {
+    const inc = JSON.parse(JSON.stringify(st)), mx = (a, b) => Math.max(a || 0, b || 0); let nw = 0, nt = 0;
+    if ((inc.v || 1) < 2) inc.words = migrate(inc.words);
+    Object.entries(inc.words || {}).forEach(([k, w]) => { const l = S.words[k]; if (!l || lastSeen(w) > lastSeen(l) || (lastSeen(w) === lastSeen(l) && (w.b || 0) > (l.b || 0))) { S.words[k] = { b: w.b || 0, d: w.d || 0, n: mx(w.n, l && l.n) }; nw++; } else l.n = mx(l.n, w.n); });
+    Object.entries(inc.listen || {}).forEach(([k, r]) => { const l = S.listen[k]; if (!l || (r.score || 0) > (l.score || 0)) S.listen[k] = r; });
+    Object.entries(inc.read || {}).forEach(([k, v]) => { if (v && !S.read[k]) S.read[k] = v; });
+    const q = x => (x.score || 0) / Math.max(1, x.total || 0);
+    Object.entries(inc.dictee || {}).forEach(([k, r]) => { const l = S.dictee[k]; if (!l || q(r) > q(l) || (q(r) === q(l) && (r.t || 0) > (l.t || 0))) S.dictee[k] = r; });
+    const deep = (a, b) => { Object.entries(b || {}).forEach(([k, v]) => { if (v && typeof v === 'object') a[k] = deep(a[k] && typeof a[k] === 'object' ? a[k] : {}, v); else if (typeof v === 'number') a[k] = mx(a[k], v); else if (a[k] === undefined) a[k] = v; }); return a; };
+    S.stats = deep(S.stats || {}, inc.stats);
+    S.bundled = Object.assign(S.bundled || {}, inc.bundled || {});
+    Object.values(inc.texts || {}).forEach(t => { if (!t || !t.id) return; const l = S.texts[t.id]; if (!l || (l.updated || 0) < (t.updated || 0)) { S.texts[t.id] = Object.assign({}, t, { synced: false }); pushText(S.texts[t.id]); nt++; } });
+    return nw + ' word' + (nw === 1 ? '' : 's') + ' and ' + nt + ' text' + (nt === 1 ? '' : 's') + ' merged';
+  }
+  const textKey = text => norm(paragraphs(text).join(' ')).slice(0, 200);
+  const textFrom = (t, n) => { // one text from an import file or the private bundle, in the shape Mine stores; null when there is nothing in it
+    if (!t || typeof t.text !== 'string' || !t.text.trim()) return null;
+    const ps = paragraphs(t.text); if (!ps.length) return null;
+    const nt = { title: String(t.title || '').trim().slice(0, 80) || ps[0].slice(0, 60), autoTitle: !t.title, text: ps.join('\n'), src: String(t.src || '').slice(0, 80), level: /^(A1|A2|B1|B2|C1)$/.test(t.level) ? t.level : '', ex: t.ex && typeof t.ex === 'object' ? t.ex : null, added: Date.now() - n, audio: typeof t.audio === 'string' ? t.audio.trim().slice(0, 120) : '', notes: typeof t.notes === 'string' ? t.notes.trim().slice(0, 20000) : '' };
+    if (t.marks && typeof t.marks === 'object' && !Array.isArray(t.marks)) nt.marks = t.marks; // a recording's turn boundaries (see app-audio.js)
+    return nt;
+  };
+  function addTexts(list) { // texts not already in Mine (same opening words), in the order given
+    const have = new Set(Object.values(S.texts).map(t => textKey(t.text))); let n = 0;
+    list.forEach(t => { const nt = textFrom(t, n); if (!nt) return; const k = textKey(nt.text); if (have.has(k)) return; have.add(k); texts.add(nt); n++; });
+    return n;
+  }
+  function preloadTexts(list) { // the private build bundles the learner's corpus (build.py --private): each text is added once; one deleted in Mine stays deleted
+    S.bundled = S.bundled || {}; const fresh = []; let changed = false;
+    (list || []).forEach(t => { if (!t || typeof t.text !== 'string') return; const k = textKey(t.text); if (!k || S.bundled[k]) return; S.bundled[k] = 1; changed = true; fresh.push(t); });
+    const n = fresh.length ? addTexts(fresh) : 0; if (changed) saveLocal(); return n;
   }
   const paragraphs = text => String(text || '').replace(/\r/g, '').split('\n').map(s => s.replace(/[\u00a0\u202f]/g, ' ').replace(/[ \t]+/g, ' ').trim()).filter(Boolean);
 
@@ -392,8 +422,8 @@
       <div class="row"><button class="btn" id="testVoice">Test voice</button><label class="row" style="gap:6px"><input type="checkbox" id="showEnSel" ${S.settings.showEn ? 'checked' : ''}> Show English in lessons</label></div>
       <div class="field"><label for="fromSel">Start from level</label><select id="fromSel">${LEVELS.map(L => `<option value="${L}" ${(S.settings.minLevel || 'A1') === L ? 'selected' : ''}>${L}${L === 'A1' ? ' (show everything)' : ''}</option>`).join('')}</select><span class="en" style="font-size:.88rem">Levels below this are hidden from the Book, Listening and Review, and their words never come up for review.</span></div>
       <p class="en" style="font-size:.9rem">${syncText} <span class="num" style="color:var(--faint)">· build ${BUILD}</span></p>
-      <div class="field"><label>Backup</label><div class="row"><button class="btn" id="exportBtn">Export everything</button><button class="btn" id="importBtn">Import a file</button><input type="file" id="importFile" accept=".json,application/json" hidden></div>
-        <span class="en" style="font-size:.88rem">Export writes one JSON file with your progress, settings and your own texts: keep it anywhere. Import restores such a backup, or, when the file holds only texts, adds them to Mine.</span></div>
+      <div class="field"><label>Backup</label><div class="row"><button class="btn" id="exportBtn">Export everything</button><button class="btn" id="importBtn">Import a file</button><button class="btn ghost" id="replaceBtn">Replace with a file</button><input type="file" id="importFile" accept=".json,application/json" hidden></div>
+        <span class="en" style="font-size:.88rem">Export writes one JSON file with your progress, settings and your own texts: keep it anywhere. Import merges such a backup into this device: for each word the more recently reviewed copy wins, best scores are kept, texts by their last edit, so a backup can go back and forth between the phone and the computer. Replace throws away what is here first. A file holding only texts adds them to Mine.</span></div>
       <div class="row" style="justify-content:space-between"><button class="btn ghost" id="resetBtn" style="color:var(--bad)">Reset all progress</button></div>
     </div>`;
     document.body.appendChild(ov);
@@ -413,15 +443,18 @@
       a.href = URL.createObjectURL(blob); a.download = 'allons-y-' + new Date().toISOString().slice(0, 10) + '.json'; document.body.appendChild(a); a.click();
       setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); toast('Backup written');
     });
-    ov.querySelector('#importBtn').addEventListener('click', () => ov.querySelector('#importFile').click());
-    ov.querySelector('#importFile').addEventListener('change', e => { const f = e.target.files[0]; if (!f) return; f.text().then(txt => { const msg = importData(JSON.parse(txt)); close(); toast(msg); }).catch(() => toast('That is not an Allons-y file')); });
+    let replace = false;
+    ov.querySelector('#importBtn').addEventListener('click', () => { replace = false; ov.querySelector('#importFile').click(); });
+    ov.querySelector('#replaceBtn').addEventListener('click', () => { replace = true; ov.querySelector('#importFile').click(); });
+    ov.querySelector('#importFile').addEventListener('change', e => { const f = e.target.files[0]; if (!f) return; f.text().then(txt => { const msg = importData(JSON.parse(txt), replace); close(); toast(msg); }).catch(() => toast('That is not an Allons-y file')); });
     const rb = ov.querySelector('#resetBtn');
     rb.addEventListener('click', () => { if (rb.dataset.armed) { adopt({}); save(); close(); toast('Progress reset'); } else { rb.dataset.armed = '1'; rb.textContent = 'Tap again to confirm reset'; } });
   }
   document.getElementById('settingsBtn').addEventListener('click', openSettings);
 
   // ---------- expose for the drills file ----------
-  window.App = { LEVELS, BOOK, WORDS, LESSONS, LISTEN, READING, texts, paragraphs, exportData, importData, visible, VLEVELS, VBOOK, VWORDS, VLISTEN, views, go, render, save, adopt, state: () => S, wstate, rate, practiceResult, dueWords, isDue, TTS, esc, fr, shuffle, pick, norm, speakBtn, toast, boxClass };
+  window.App = { LEVELS, BOOK, WORDS, LESSONS, LISTEN, READING, texts, paragraphs, exportData, importData, mergeState, addTexts, preloadTexts, textKey, visible, VLEVELS, VBOOK, VWORDS, VLISTEN, views, go, render, save, adopt, state: () => S, wstate, rate, practiceResult, dueWords, isDue, TTS, esc, fr, shuffle, pick, norm, speakBtn, toast, boxClass };
+  if (Array.isArray(window.FR_PRIVATE_TEXTS)) preloadTexts(window.FR_PRIVATE_TEXTS); // the private build's bundled corpus
   render();
   initDb();
 })();

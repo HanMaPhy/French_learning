@@ -66,12 +66,22 @@ Leitner 盒子 0–5，间隔 0 / 1 / 3 / 7 / 14 / 30 天。
 - 进度按 `课id:headword` 存，所以可以调顺序、加词；别改已有 headword 的拼写，否则那个词的进度会断开。
 - 改完在浏览器里打开 `test.html`，应该显示 ALL PASSED；展开下面的列表可以看每一句挖的是哪个词。
 
-## 独立于 Claude
+## 独立于 Claude：两个版本
 
-app 本身是静态文件，不依赖任何服务。三条和 Claude 的耦合都已经能解开：
+app 本身是静态文件，不依赖任何服务。同一份源码出两种 build，差别只在数据，不在代码：
 
-- **托管**：`python3 build.py` 把 fragment 格式的 `index.html` 包成完整页面写进 `docs/`，并复制脚本和数据。`docs/index.html` 可以直接双击打开；放到 GitHub Pages（Settings → Pages → Deploy from a branch → main，folder `/docs`）、Cloudflare Pages 或任何静态托管都行。每次改代码后重跑 `build.py` 再提交。
-- **数据**：Settings → Backup → Export everything 导出一个 JSON（进度、设置、Mine 里的文本）；Import a file 恢复。文件里只有 `texts` 时按「添加文本」处理，已有的同文本不重复加。
+| | 公开版 `docs/` | 私有版 `local/` |
+|---|---|---|
+| 命令 | `python3 build.py` | `python3 build.py --private` |
+| 内容 | 只有原创课程（词汇、阅读、短文、Numbers、Forms） | 同上，加上 `library/*.json` 预载进 Mine、`audio/` 链接到页面旁边 |
+| 放哪 | 提交进仓库，GitHub Pages（Settings → Pages → branch main, folder `/docs`）；手机电脑都能开 | 不进仓库（.gitignore），只在这台电脑：`cd local && python3 -m http.server 8000`，开 `http://localhost:8000`；同一 Wi-Fi 的手机开 `http://<电脑 IP>:8000` 也行 |
+| 录音 | 要 Choose the folder | 直接播放，不用选文件夹（`data/private-audio.js` 列出每个录音的 URL） |
+
+私有版打开时把 `data/private-texts.js` 里的语料加进 Mine，每条只加一次（`S.bundled` 记住已加过的），在 Mine 里删掉的不会回来；版权材料只存在这台电脑的 `local/` 里，永远不进仓库也不上传。
+
+- **进度是分裂的**：两个版本是两个 origin，各有一份 localStorage，互不相通。连接它们的只有 Settings → Backup：Export everything 导出一个 JSON（进度、设置、Mine 里的文本、笔记、录音的 marks）；**Import a file 是合并**，不是覆盖：每个词取最近复习过的那份（到期日减去该盒子的间隔即上次复习时间，平局取高盒子），尝试次数取大者；短文和听写取最好成绩；统计计数取大者；文本按 `updated` 新者胜。规则幂等且对称，所以同一个备份导两次、或两边互导，结果一样，隔几天把一边的 backup 导到另一边就行。**Replace with a file** 才是整体覆盖。文件里只有 `texts` 时按「添加文本」处理，已有的同文本不重复加。设置（voice、语速）不参与合并，它们是每台设备自己的。
+- **分工建议**：手机用公开版刷课程、Review、听力短文、Numbers、Forms；电脑用私有版做语料、录音听写、笔记。两边重叠的只有 Review 进度，靠合并解决。
+- 在 Claude 上写过的 notes、marks、Explain 讲解只存在 artifact 的 db 和那台浏览器里，离开前先 Export 一次。
 - **Explain**：Mine 里每条文本的 Explain 卡片下有「Without Claude」：Copy prompt 复制讲解 prompt，交给任何助手，把它返回的 JSON 贴回来，Use this answer 存入，效果与 Claude 在页内写的一样。
 
 ## 自己的语料

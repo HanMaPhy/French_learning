@@ -7,3 +7,5 @@ audio/
 .DS_Store
 Thumbs.db
 *.swp
+# the private build (build.py --private): the public build is docs/
+local/

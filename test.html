@@ -220,6 +220,28 @@
     const itV = { answers: ['suis allée', 'suis allé'] }; check(J(itV, 'suis  allé') === 'ok' && J(itV, 'suis aller') === 'sound' && J({ answers: ['lève-toi'] }, 'lève toi') === 'ok' && J({ answers: ["n'ai pas eu"] }, 'n’ai pas eu') === 'ok', 'judge: spacing, hyphens and curly apostrophes');
 
 
+    log('— merging two devices —');
+    { const NOW = Date.now(), DAY = 864e5, S0 = S(), keep = JSON.parse(JSON.stringify({ words: S0.words, listen: S0.listen, read: S0.read, dictee: S0.dictee, stats: S0.stats }));
+      const mk = (words, extra) => Object.assign({ v: 2, words, listen: {}, read: {}, dictee: {}, stats: {}, texts: {}, settings: {} }, extra || {});
+      const mine = mk({ 'k:x': { b: 3, d: NOW + 7 * DAY, n: 4 }, 'k:y': { b: 0, d: NOW + 600e3, n: 2 } }, { stats: { numbers: { n: 4, ok: 4 } }, listen: { p1: { score: 5, total: 5 } } });
+      const other = mk({ 'k:x': { b: 0, d: NOW - DAY + 600e3, n: 1 }, 'k:y': { b: 2, d: NOW - 20 * DAY + 3 * DAY, n: 5 }, 'k:z': { b: 1, d: NOW + DAY, n: 1 } }, { stats: { numbers: { n: 10, ok: 7 }, dict: { words: 3 } }, listen: { p1: { score: 3, total: 5 }, p2: { score: 2, total: 4 } }, dictee: { 'reading:a1-1': { score: 9, total: 10, t: 1 } } });
+      const snap = () => JSON.stringify({ words: S().words, listen: S().listen, dictee: S().dictee, stats: S().stats });
+      S0.words = JSON.parse(JSON.stringify(mine.words)); S0.stats = JSON.parse(JSON.stringify(mine.stats)); S0.listen = JSON.parse(JSON.stringify(mine.listen)); S0.dictee = {};
+      const msg = A.importData({ state: other }); const W = S().words;
+      check(W['k:x'].b === 3 && W['k:y'].b === 0 && W['k:y'].n === 5 && W['k:z'].b === 1, 'the more recently reviewed copy of a word wins, counts take the larger (' + msg + ')');
+      check(S().stats.numbers.ok === 7 && S().stats.numbers.n === 10 && S().stats.dict.words === 3 && S().listen.p1.score === 5 && S().listen.p2.score === 2 && S().dictee['reading:a1-1'].score === 9, 'counters take the larger value, best scores are kept');
+      const once = snap(); A.importData({ state: other }); check(snap() === once, 'merging the same backup twice changes nothing');
+      S0.words = JSON.parse(JSON.stringify(other.words)); S0.stats = JSON.parse(JSON.stringify(other.stats)); S0.listen = JSON.parse(JSON.stringify(other.listen)); S0.dictee = JSON.parse(JSON.stringify(other.dictee)); A.importData({ state: mine });
+      check(snap() === once, 'merging in the other direction gives the same state');
+      const vt = JSON.parse(JSON.stringify(S().texts)); A.importData({ state: mk({ 'k:x': { b: 5, d: NOW + 40 * DAY, n: 1 } }) }, true); check(S().words['k:x'].b === 5 && !S().words['k:y'] && JSON.stringify(S().texts) === JSON.stringify(vt), 'replace discards the local progress and keeps the texts');
+      Object.assign(S0, keep); }
+    { const n0 = Object.keys(S().texts).length, bundle = [{ title: 'Privé 1', text: 'Bonjour tout le monde. Ça va ?', audio: 'Leçon 99.mp3' }, { title: 'Privé 2', text: 'Deuxième texte du corpus privé.' }];
+      const n1 = A.preloadTexts(bundle), n2 = A.preloadTexts(bundle);
+      check(n1 === 2 && n2 === 0 && Object.keys(S().texts).length === n0 + 2, 'a bundled corpus is added once (' + n1 + ' then ' + n2 + ')');
+      const id = Object.values(S().texts).find(t => t.title === 'Privé 2').id; A.texts.remove(id); const n3 = A.preloadTexts(bundle);
+      check(n3 === 0 && !S().texts[id], 'a bundled text deleted in Mine stays deleted');
+      const t1 = Object.values(S().texts).find(t => t.title === 'Privé 1'); check(t1 && t1.audio === 'Leçon 99.mp3' && S().bundled && Object.keys(S().bundled).length >= 2, 'the bundle keeps the recording name and the keys are remembered');
+      A.texts.remove(t1.id); }
     log('— my texts —');
     const PG = A.paragraphs('Bonjour !\r\n\nÇa va ?   Oui.\n\n\n« Salut »');
     check(PG.length === 3 && PG[1] === 'Ça va ? Oui.' && PG[0] === 'Bonjour !', 'paragraph splitting: ' + PG.join(' | '));
@@ -236,7 +258,7 @@
     const bk = A.exportData(); check(bk.app === 'allons-y' && bk.state.texts[avis.id] && bk.state.words && bk.state.settings, 'a backup carries progress, settings and texts');
     const PA = A.mine.parseAnswer; check(PA('{"a":1}').a === 1 && PA('Here it is:\n```json\n{"a":2}\n```').a === 2 && PA('Sure. {"a":3} Hope it helps').a === 3 && PA('nothing') === null, 'a pasted answer is read as JSON, fenced or not');
     A.texts.remove(avis.id); const withText = JSON.parse(JSON.stringify(bk)); withText.state.settings.rate = 0.77;
-    check(A.importData(withText) === 'Backup restored' && S().settings.rate === 0.77 && S().texts[avis.id] && S().texts[T.id], 'restoring a backup brings its texts back and keeps the ones it lacks'); A.texts.remove(avis.id); fresh();
+    check(A.importData(withText, true) === 'Backup restored' && S().settings.rate === 0.77 && S().texts[avis.id] && S().texts[T.id], 'replacing with a backup brings its texts back and keeps the ones it lacks'); A.texts.remove(avis.id); fresh();
     check(A.mine.prompt(['Un.', 'Deux.']).includes('exactly 2 strings') && A.mine.prompt(['Un.']).includes('["Un."]'), 'the explanation prompt carries the paragraphs and their count');
 
     log('— views and drills —');

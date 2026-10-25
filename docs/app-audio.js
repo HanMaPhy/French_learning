@@ -24,7 +24,9 @@
     picker.onchange = () => { const n = adopt(picker.files); picker.value = ''; res(n); };
     picker.click();
   });
-  const have = name => mem.has(key(name)) || cached.has(key(name));
+  // the private build (build.py --private) serves the recordings next to the page and lists them in FR_PRIVATE_AUDIO: those play by URL, no folder to pick
+  const served = new Map(); Object.entries(window.FR_PRIVATE_AUDIO || {}).forEach(([k, u]) => served.set(key(k), u));
+  const have = name => mem.has(key(name)) || cached.has(key(name)) || served.has(key(name));
   const get = async name => { const k = key(name); if (mem.has(k)) return mem.get(k); const c = await tx('readonly', st => st.get(k)); if (c && c.blob) { mem.set(k, c.blob); cached.add(k); return c.blob; } return null; };
   const remember = async name => { const k = key(name), f = mem.get(k); if (!f || cached.has(k)) return; if ((await tx('readwrite', st => st.put({ name: f.name || name, blob: f }, k))) !== undefined) cached.add(k); };
   const forget = () => { mem.clear(); cached.clear(); unload(); return tx('readwrite', st => st.clear()); };
@@ -39,12 +41,12 @@
   const unload = () => { if (P.el) { P.el.pause(); P.el.removeAttribute('src'); } if (P.url) URL.revokeObjectURL(P.url); P.el = null; P.name = ''; P.url = ''; P.err = ''; };
   const load = async name => {
     if (P.el && P.name === name) return P.el;
-    const f = await get(name); if (!f) return null;
-    unload(); const el = new Audio(); P.url = URL.createObjectURL(f); el.src = P.url; el.preload = 'auto'; el.playbackRate = P.rate; try { el.preservesPitch = true; } catch (e) { /* older engines */ }
-    const fname = f.name || name;
+    const f = await get(name), url = served.get(key(name)); if (!f && !url) return null;
+    unload(); const el = new Audio(); if (f) { P.url = URL.createObjectURL(f); el.src = P.url; } else el.src = url; el.preload = 'auto'; el.playbackRate = P.rate; try { el.preservesPitch = true; } catch (e) { /* older engines */ }
+    const fname = f ? (f.name || name) : name;
     el.addEventListener('error', () => { P.err = /\.wma$/i.test(fname) ? 'Browsers cannot play .wma files: convert them to .mp3 first (the README says how), then pick the folder again.' : 'This browser cannot play « ' + fname + ' ».'; paint(); });
     el.addEventListener('loadedmetadata', paint); el.addEventListener('play', () => { paint(); tick(); }); el.addEventListener('pause', paint); el.addEventListener('ended', paint);
-    P.el = el; P.name = name; remember(name); return el;
+    P.el = el; P.name = name; if (f) remember(name); return el;
   };
   const tick = () => {
     cancelAnimationFrame(P.raf);
