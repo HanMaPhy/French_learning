@@ -47,4 +47,5 @@ if private:
     print('private build: %d texts from library/, %d recordings from audio/' % (len(texts), n))
 io.open(os.path.join(out, 'index.html'), 'w', encoding='utf8').write(head + frag + '\n</body></html>\n')
 io.open(os.path.join(out, '.nojekyll'), 'w').write('')
+io.open(os.path.join(out, 'version.json'), 'w').write(json.dumps({'build': int((re.search(r'app-core\.js\?v=(\d+)', frag) or [None, '0'])[1])}))  # the app polls this to offer a reload when a newer build is published
 print('built %s/ with %d scripts and %d data files' % (os.path.relpath(out, root), len([f for f in os.listdir(out) if f.endswith('.js')]), len(os.listdir(os.path.join(out, 'data')))))

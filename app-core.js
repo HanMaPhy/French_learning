@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1'];
-  const BUILD = 20; // bump together with the ?v= on the script tags in index.html whenever the scripts change
+  const BUILD = 21; // bump together with the ?v= on the script tags in index.html whenever the scripts change
 
   // ---------- merge data files into one book ----------
   const BOOK = [];
@@ -446,7 +446,7 @@
         <span class="en" style="font-size:.88rem">Speed is a request to the voice, not a command: Apple's Premium and Enhanced voices in particular barely change pace with it. The Slower button in Dictation and Listen &amp; pick, and Slow on a passage, do not depend on it: they read in breath groups with a pause between them, at a reduced speed, so they are slower with every voice.</span></div>
       <div class="row"><button class="btn" id="testVoice">Test voice</button><label class="row" style="gap:6px"><input type="checkbox" id="showEnSel" ${S.settings.showEn ? 'checked' : ''}> Show English in lessons</label></div>
       <div class="field"><label for="fromSel">Start from level</label><select id="fromSel">${LEVELS.map(L => `<option value="${L}" ${(S.settings.minLevel || 'A1') === L ? 'selected' : ''}>${L}${L === 'A1' ? ' (show everything)' : ''}</option>`).join('')}</select><span class="en" style="font-size:.88rem">Levels below this are hidden from the Book, Listening and Review, and their words never come up for review.</span></div>
-      <p class="en" style="font-size:.9rem">${syncText} <span class="num" style="color:var(--faint)">· build ${BUILD}</span></p>
+      <p class="en" style="font-size:.9rem">${syncText} <span class="num" style="color:var(--faint)">· build ${BUILD}</span> <button class="btn ghost" id="updBtn" style="padding:2px 8px;font-size:.85rem">Check for updates</button></p>
       <div class="field"><label>Backup</label><div class="row"><button class="btn" id="exportBtn">Export everything</button><button class="btn" id="importBtn">Import a file</button><button class="btn" id="siteBtn" title="Merges the progress file published next to this site (tools/publish-backup.py), if there is one">Import from the site</button><button class="btn ghost" id="replaceBtn">Replace with a file</button><input type="file" id="importFile" accept=".json,application/json" hidden></div>
         <span class="en" style="font-size:.88rem">Export writes one JSON file with your progress, settings and your own texts: keep it anywhere. Import merges such a backup into this device: for each word the more recently reviewed copy wins, best scores are kept, texts by their last edit, so a backup can go back and forth between the phone and the computer. Replace throws away what is here first. A file holding only texts adds them to Mine. Import from the site pulls the progress-only backup published next to the app, if one is there: on the computer, run tools/publish-backup.py on an export and push.</span></div>
       <div class="row" style="justify-content:space-between"><button class="btn ghost" id="resetBtn" style="color:var(--bad)">Reset all progress</button></div>
@@ -463,6 +463,7 @@
     ov.querySelector('#showEnSel').addEventListener('change', e => { S.settings.showEn = e.target.checked; save(); });
     ov.querySelector('#fromSel').addEventListener('change', e => { S.settings.minLevel = e.target.value; save(); });
     ov.querySelector('#testVoice').addEventListener('click', () => TTS.speak('Bonjour ! Allons-y, apprenons le français ensemble.'));
+    ov.querySelector('#updBtn').addEventListener('click', () => A.checkUpdate(true));
     ov.querySelector('#exportBtn').addEventListener('click', () => {
       const blob = new Blob([JSON.stringify(exportData(), null, 1)], { type: 'application/json' }), a = document.createElement('a');
       a.href = URL.createObjectURL(blob); a.download = 'allons-y-' + new Date().toISOString().slice(0, 10) + '.json'; document.body.appendChild(a); a.click();
@@ -485,4 +486,18 @@
   if (Array.isArray(window.FR_PRIVATE_TEXTS)) preloadTexts(window.FR_PRIVATE_TEXTS); // the private build's bundled corpus
   render();
   initDb();
+  // A page opened from the home screen has no reload button and keeps the cached page for a while after a new build is published, so the app
+  // asks the site which build is current (version.json, written by build.py) and offers a reload; silent wherever the file does not exist.
+  function checkUpdate(manual) {
+    if (!/^https?:/.test(location.protocol)) { if (manual) toast('Updates are checked on the published site'); return; }
+    fetch('version.json', { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error(); return r.json(); }).then(o => {
+      if (!(o && o.build > BUILD)) { if (manual) toast('Build ' + BUILD + ' is the latest'); return; }
+      let bar = document.getElementById('updateBar');
+      if (!bar) { bar = document.createElement('div'); bar.id = 'updateBar'; bar.className = 'toast'; bar.style.cursor = 'pointer'; bar.setAttribute('role', 'button'); document.body.appendChild(bar); bar.addEventListener('click', () => location.reload()); }
+      bar.textContent = 'Build ' + o.build + ' is ready · tap to update';
+    }).catch(() => { if (manual) toast('Could not reach the site'); });
+  }
+  A.checkUpdate = checkUpdate;
+  setTimeout(() => checkUpdate(false), 1500);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkUpdate(false); });
 })();
