@@ -116,7 +116,11 @@
       check(order.join(' ') === 'Audrey Aurélie Thomas Amélie Eddy', 'iOS voices, no tier in the name: premium Audrey first, then enhanced, then compact (' + order.join(' > ') + ')');
       check(A.TTS.label(ios[1]) === 'Audrey · Premium' && A.TTS.label(mk('Audrey (Premium)', 'com.apple.voice.premium.fr-FR.Audrey')) === 'Audrey (Premium)' && A.TTS.label(ios[0]) === 'Thomas · Compact', 'the tier is shown once in the label');
       const mac = [mk('Thomas', 'com.apple.voice.compact.fr-FR.Thomas'), mk('Audrey (Premium)', 'com.apple.voice.premium.fr-FR.Audrey'), mk('Google français', 'Google français', 'fr-FR')];
-      check(mac.slice().sort((a, b) => A.TTS.rank(b) - A.TTS.rank(a))[0].name === 'Audrey (Premium)', 'a Mac still prefers the premium voice'); }
+      check(mac.slice().sort((a, b) => A.TTS.rank(b) - A.TTS.rank(a))[0].name === 'Audrey (Premium)', 'a Mac still prefers the premium voice');
+      const T = A.TTS, keep = { v: T.voices, m: T.mobileApple, s: S().settings.voice };
+      T.mobileApple = true; T.voices = [ios[0], ios[4]]; S().settings.voice = ''; const a = T.useSystem(); T.voices = ios; const b = T.useSystem(); S().settings.voice = 'Thomas'; const c = T.useSystem(); S().settings.voice = 'system'; T.mobileApple = false; const d = T.useSystem(); S().settings.voice = ''; const e = T.useSystem();
+      check(a && !b && !c && d && !e, 'the system voice is used on iOS when only built-in voices are listed, or when chosen (' + [a, b, c, d, e].join(' ') + ')');
+      T.voices = keep.v; T.mobileApple = keep.m; S().settings.voice = keep.s; }
     log('— readings —');
     const RD = A.READING, rids = Object.keys(RD), lids = Object.keys(A.LESSONS);
     check(rids.length === 30 && lids.every(id => RD[id]), rids.length + ' readings, one per lesson' + (lids.some(id => !RD[id]) ? ' (missing: ' + lids.filter(id => !RD[id]).join(' ') + ')' : ''));

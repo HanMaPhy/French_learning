@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1'];
-  const BUILD = 17; // bump together with the ?v= on the script tags in index.html whenever the scripts change
+  const BUILD = 18; // bump together with the ?v= on the script tags in index.html whenever the scripts change
 
   // ---------- merge data files into one book ----------
   const BOOK = [];
@@ -191,6 +191,10 @@
     quality(v) { const u = String(v.voiceURI || '').toLowerCase(); return /premium/.test(u) ? 'premium' : /enhanced/.test(u) ? 'enhanced' : /siri/.test(u) ? 'siri' : /compact/.test(u) ? 'compact' : ''; }, // Apple: com.apple.voice.premium.fr-FR.Audrey
     label(v) { const q = this.quality(v); return v.name + (q && !new RegExp(q, 'i').test(v.name) ? ' · ' + q[0].toUpperCase() + q.slice(1) : ''); },
     voice() { if (!this.voices.length) this.refresh(); return this.voices.find(x => x.name === S.settings.voice) || this.voices[0] || null; },
+    // iOS Safari shows web pages only a small built-in set of voices (Thomas, Amélie…) and hides downloaded ones. An utterance given a language
+    // but no voice is read by the voice selected for that language in the system settings, so on an iPhone or iPad that is the way to Audrey.
+    mobileApple: /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1),
+    useSystem() { if (S.settings.voice === 'system') return true; if (S.settings.voice) return false; return this.mobileApple && !this.voices.some(v => /premium|enhanced|siri/.test(this.quality(v)) || /(Natural|Neural|Premium|Enhanced|Siri)/i.test(v.name)); },
     noFrench() { return this.supported() && this.all.length > 0 && this.voices.length === 0; },
     ready() {
       if (!this.supported()) return Promise.resolve();
@@ -252,7 +256,7 @@
         if (!v && this.noFrench()) { if (!this.warned) { this.warned = true; toast('No French voice installed: see Settings'); } res(false); return; }
         if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel();
         const u = new SpeechSynthesisUtterance(text);
-        u.lang = 'fr-FR'; if (v) u.voice = v;
+        u.lang = 'fr-FR'; if (v && !this.useSystem()) u.voice = v;
         u.rate = rate != null ? rate : S.settings.rate; u.pitch = 1;
         u.onend = () => res(true); u.onerror = () => res(false);
         this.keep = [u]; // keep a reference: Chrome drops callbacks on collected utterances
@@ -418,8 +422,8 @@
     const syncText = { local: 'Progress is saved in this browser.', cloud: 'Progress is saved to your account and in this browser.', error: 'Cloud sync failed; progress is still saved in this browser.' }[sync.status];
     ov.innerHTML = `<div class="dialog" role="dialog" aria-label="Settings">
       <div class="row" style="justify-content:space-between"><h2>Settings</h2><button class="btn ghost" id="closeSet">Close</button></div>
-      <div class="field"><label for="voiceSel">French voice</label><select id="voiceSel"><option value="">Automatic${auto ? ' · ' + esc(TTS.label(auto)) : ''}</option>${opts}</select>
-        <span class="en" style="font-size:.88rem">${TTS.voices.length ? TTS.voices.length + ' French voice' + (TTS.voices.length > 1 ? 's' : '') + ' found, best first; Eddy, Flo, Grandma and the like are novelty voices. For the most natural reading: Chrome has Google français, Edge has Denise (Natural), and on a Mac or iPhone you can download Audrey (Premium) or Aurélie (Enhanced) in the system speech settings.' : 'No French voice found yet. Install one in the system speech settings (Mac or iPhone: Audrey, Aurélie or Thomas), then reload. Chrome and Edge bring their own French voices.'}</span></div>
+      <div class="field"><label for="voiceSel">French voice</label><select id="voiceSel"><option value="">Automatic${TTS.useSystem() && !S.settings.voice ? ' · the system French voice' : auto ? ' · ' + esc(TTS.label(auto)) : ''}</option><option value="system" ${S.settings.voice === 'system' ? 'selected' : ''}>System French voice (chosen in the device settings)</option>${opts}</select>
+        <span class="en" style="font-size:.88rem">${TTS.voices.length ? TTS.voices.length + ' French voice' + (TTS.voices.length > 1 ? 's' : '') + ' found, best first; Eddy, Flo, Grandma and the like are novelty voices. For the most natural reading: Chrome has Google français, Edge has Denise (Natural), and on a Mac or iPhone you can download Audrey (Premium) or Aurélie (Enhanced) in the system speech settings.' + (TTS.mobileApple ? ' On an iPhone or iPad, Safari lists only the built-in voices and hides downloaded ones: choose Audrey in Settings → Accessibility → Read & Speak (Spoken Content) → Voices → French, and use the system voice here.' : '') : 'No French voice found yet. Install one in the system speech settings (Mac or iPhone: Audrey, Aurélie or Thomas), then reload. Chrome and Edge bring their own French voices.'}</span></div>
       <div class="field"><label for="rateSel">Speed <span class="num" id="rateVal">${S.settings.rate.toFixed(2)}×</span></label><input type="range" id="rateSel" min="0.5" max="1.2" step="0.05" value="${S.settings.rate}">
         <span class="en" style="font-size:.88rem">Speed is a request to the voice, not a command: Apple's Premium and Enhanced voices in particular barely change pace with it. The Slower button in Dictation and Listen &amp; pick, and Slow on a passage, do not depend on it: they read in breath groups with a pause between them, at a reduced speed, so they are slower with every voice.</span></div>
       <div class="row"><button class="btn" id="testVoice">Test voice</button><label class="row" style="gap:6px"><input type="checkbox" id="showEnSel" ${S.settings.showEn ? 'checked' : ''}> Show English in lessons</label></div>
@@ -436,7 +440,7 @@
     ov.addEventListener('click', e => { if (e.target === ov) close(); });
     ov.querySelector('#closeSet').focus();
     ov.querySelector('#closeSet').addEventListener('click', close);
-    ov.querySelector('#voiceSel').addEventListener('change', e => { S.settings.voice = e.target.value; save(); TTS.speak('Bonjour ! Je m’appelle ' + (TTS.voice() ? TTS.voice().name.replace(/\s*\(.*$/, '') : 'Allons-y') + '.'); });
+    ov.querySelector('#voiceSel').addEventListener('change', e => { S.settings.voice = e.target.value; save(); TTS.speak(TTS.useSystem() ? 'Bonjour ! Je suis la voix française de votre appareil.' : 'Bonjour ! Je m’appelle ' + (TTS.voice() ? TTS.voice().name.replace(/\s*\(.*$/, '') : 'Allons-y') + '.'); });
     ov.querySelector('#rateSel').addEventListener('input', e => { S.settings.rate = parseFloat(e.target.value); ov.querySelector('#rateVal').textContent = S.settings.rate.toFixed(2) + '×'; save(); });
     ov.querySelector('#showEnSel').addEventListener('change', e => { S.settings.showEn = e.target.checked; save(); });
     ov.querySelector('#fromSel').addEventListener('change', e => { S.settings.minLevel = e.target.value; save(); });
