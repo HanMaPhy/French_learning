@@ -19,7 +19,7 @@
 
 ## 怎么用
 
-三个 tab：
+五个 tab：
 
 - **Book**：A1–C1 五章、每章六课、每课十个词 × 三句例句。点进一课有六种练习：Flashcards（看词想义，自评）、Fill the gap（选词填空）、Rebuild（把打乱的词排回句子）、Dictation（听写）、EN → FR（看英文说法语再核对）、Listen & pick（听句选义）。课文页可以逐句朗读，也能整课连播。
 - **Reading**（每课页面顶部的卡片）：一篇按级别写的长文，逐段朗读、可切慢读、可显示英译；下面是 About this text（文体与语域讲解）、Vocabulary（正文里的生词，带原句）、Sentence patterns（可复用的句型）、Idioms & expressions、Grammar（以正文例句讲的语法点）。读完点 Mark as read，课页上会标 read ✓。
@@ -33,10 +33,10 @@
 - **My notes**（Mine 每条文本的卡片）：自由文本，贴你自己或任何助手给的讲解（生词、句型、翻译、问题），和文本一起存进账号、进备份。空行分段，`-`、`•`、`1.` 开头的行成列表，`#` 或「Vocabulaire :」这类单独一行成小标题，`**粗体**` 可用，其余照原样显示。想要和课程阅读一样的结构化讲解（分段英译、Vocabulary、Sentence patterns、Idioms、Grammar 五个卡片），用 Explain 卡片里的 Copy prompt，把助手返回的 JSON 贴回 Use this answer。
 - **录音**（Mine）：一条文本可以带一个录音文件名（导入文件里的 `audio` 字段，或 Edit 里填）。打开文本时上方出现 Recording 卡片：第一次点 Choose the folder 选中 `audio/` 这个文件夹（`python3 tools/collect-audio.py` 把文本用到的 145 个录音收在这里，按书分四个子目录；文件只在本机浏览器里用，不上传；播放过的文件会缓存进 IndexedDB，下次不用再选）。播放器有 −3 s、0.7× / 0.85× / 1× 变速和 A–B 区间：按 A、B 标出一段，播放到 B 自动停并回到 A，Loop 反复。Dictée from the recording 用真人录音做听写：先整段听，再逐个 turn 写——按 Play 听，在这个 turn 结束处按 B，这一段就被隔离出来反复听，写完 Check 判分（同样分 by ear / spelling）。按 Next 时 A–B 保存到文本的 `marks` 里，下次每个 turn 自动按段播放。Listening 页的 Mine 组里带录音的文本直接进这种听写。浏览器放不了 `.wma`，要先转成 `.mp3`（见下文），同名即可。
 - **Numbers**（Listening 页）：程序生成的数字听写，每轮十题，从十四类里抽：数字、大数（千、百万、十亿）、年份、世纪、楼层/区/名次（序数词）、时刻、营业时间（两个时刻）、价格、百分比、身高与带小数的量、温度（含负数）、一句话里的两个数、电话号码、日期（可带星期）；数字永远嵌在一句话里念。答案打数字（17h45、9h 18h30、32,60、12,5、-7、1,82、23/10/2026、06 42 18 73 95、「35 12」等格式都接受）。
-- **Forms in sentences**（Listening 页 → Dictation training 卡片）：变形练习，每题一句话、挖掉一个形式。两种模式：**Write** 看到原形和时态（`(aller, passé composé)` 这样的提示写在空格里），打出正确形式；**Hear** 先听整句，再写空格里听到的那个词——parlé / parlait / parlaient 听起来一样，只能靠语法定拼写，这正是听写丢分最多的地方。判分分四档：对、字母对但重音符错、发音对但拼写错（语法）、错；每题给出正确形式、完整句子（可朗读）、英译和一行规则。题材十六组：
+- **Forms**（第四个 tab）：变形练习，每题一句话、挖掉一个形式。三种模式：**Choose** 给四个选项，全是同一个词的不同形式（同一时态的其他人称、同一人称的相邻时态、另一性别的分词；形容词的四种形式；代词、冠词、比较级各自的小集合），发音相同的形式优先当干扰项（parlé / parlait / parlaient、a pris / ont pris），点选判对错；**Write** 看到原形和时态（`(aller, passé composé)` 这样的提示写在空格里），打出正确形式；**Hear** 先听整句，再写空格里听到的那个词——parlé / parlait / parlaient 听起来一样，只能靠语法定拼写，这正是听写丢分最多的地方。判分分四档：对、字母对但重音符错、发音对但拼写错（语法）、错；每题给出正确形式、完整句子（可朗读）、英译和一行规则。题材十六组：
   - 动词八个时态（présent、passé composé、imparfait、futur simple、conditionnel、subjonctif、impératif、plus-que-parfait）：`data/forms.js` 里的 `frames` 是带 `{S}`（主语）和 `{V}`（动词）槽位的句型，主语从九个人称代词和九个名字短语里随机抽，`app-forms.js` 里的 conjugator 现场变位（规则动词按词尾，-cer/-ger/-yer/e–è/é–è/appeler–jeter 的拼写变化自动处理，约九十个不规则动词和反身动词有表），所以同一句型每次换主语。否定（`{NV}`）把 ne … pas 一起放进空格。主语是 je / tu / nous / vous 时性别未知，être 类动词的分词各种一致形式都接受。
   - 一致与小词八组，手写题库：形容词性数（beau/bel/belle、-eux/-euse、-al/-aux…）、名词复数（-al/-aux、-eau/-eaux、七个 -ou/-x、yeux、messieurs）、-ment 副词（-emment/-amment）、宾语代词（le/la/les/lui/leur/y/en、次序、重读式）、冠词与所有格（au/aux/du/des、mon amie、cet homme、否定后的 de）、比较级（meilleur/mieux/pire、plus/moins/aussi/autant）、tout/toute/tous/toutes、分词一致（être、avoir + 前置直接宾语、反身）。
-  - 每组的正确率记在 `S.stats.forms`，菜单页显示。添加题目：`frames` 一行 `["时态", "动词原形", "法语句型", "英译", {s: 主语限制}]`，`items` 一行 `["组", "带 ___ 的句子", "答案|备选", "提示", "英译", "规则"]`。
+  - 每组的正确率记在 `S.stats.forms`，菜单页显示；三种模式共用。不变化的词（difficile、gris、pays）选项不够时补上错误词尾当干扰项，「它不变」本身就是考点。添加题目：`frames` 一行 `["时态", "动词原形", "法语句型", "英译", {s: 主语限制}]`，`items` 一行 `["组", "带 ___ 的句子", "答案|备选", "提示", "英译", "规则"]`。
 - **Slower / Slow**：Dictation、Listen & pick 里的 Slower 按钮和短文页的 Slow 开关不靠 voice 的 rate 参数——Apple 的 Premium / Enhanced voice 基本不理这个参数，所以以前慢速和常速听不出差别——而是把句子切成呼吸组（标点处，再在连词、关系代词、介词前），每组降速念，组之间停顿；任何 voice 上都明显更慢。
 
 ## 进度与复习算法

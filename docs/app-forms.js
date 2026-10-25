@@ -116,7 +116,7 @@
     const my = s.p === 2 ? (s.on ? 'our' : s.g === 'f' ? 'her' : 'his') : ['my', 'your', '', 'our', 'your', 'their'][s.p], third = s.p === 2 && !s.on;
     const enText = cap(en.replace(/\{S\}/g, s.en).replace(/\{O\}/g, s.o).replace(/\{my\}/g, my).replace(/\{V:([^|}]+)\|([^}]+)\}/g, (m, a, b) => third ? b : a)
       .replace(/\{B:([^}]+)\}/g, (m, x) => { const v = x.split('|'); return v.length === 3 ? (s.p === 0 ? v[0] : third ? v[1] : v[2]) : (s.p === 0 || third ? v[0] : v[1]); }));
-    return { topic: tense, kind: 'verb', blank: fill(text, '___'), full: fill(text, g.text), answers: g.answers, show: g.text, cue: (neg ? 'ne pas ' : '') + inf + (tense === 'imper' ? ', ' + s.w : ''), label: T[tense], en: enText, note: hint(inf, tense, s.p) };
+    return { topic: tense, kind: 'verb', v: { inf, tense, p: s.p, g: s.g, vous: s.vous, neg }, blank: fill(text, '___'), full: fill(text, g.text), answers: g.answers, show: g.text, cue: (neg ? 'ne pas ' : '') + inf + (tense === 'imper' ? ', ' + s.w : ''), label: T[tense], en: enText, note: hint(inf, tense, s.p) };
   };
   const fromItem = it => { const [topic, text, ans, cue, en, note] = it, answers = ans.split('|'); return { topic, kind: 'item', blank: text, full: text.replace('___', answers[0]).replace(/' /g, "'"), answers, show: answers[0], cue, label: LABEL[topic], en, note }; };
 
@@ -146,6 +146,55 @@
     return 'ko';
   };
 
+  // ---------- the other forms of the same word, for the multiple-choice mode ----------
+  const ADJ_X = { beau: ['beau', 'belle', 'beaux', 'belles', 'bel'], nouveau: ['nouveau', 'nouvelle', 'nouveaux', 'nouvelles', 'nouvel'], vieux: ['vieux', 'vieille', 'vieux', 'vieilles', 'vieil'], fou: ['fou', 'folle', 'fous', 'folles', 'fol'],
+    blanc: ['blanc', 'blanche', 'blancs', 'blanches'], franc: ['franc', 'franche', 'francs', 'franches'], long: ['long', 'longue', 'longs', 'longues'], frais: ['frais', 'fraîche', 'frais', 'fraîches'], doux: ['doux', 'douce', 'doux', 'douces'], faux: ['faux', 'fausse', 'faux', 'fausses'], roux: ['roux', 'rousse', 'roux', 'rousses'],
+    sec: ['sec', 'sèche', 'secs', 'sèches'], public: ['public', 'publique', 'publics', 'publiques'], grec: ['grec', 'grecque', 'grecs', 'grecques'], gros: ['gros', 'grosse', 'gros', 'grosses'], gras: ['gras', 'grasse', 'gras', 'grasses'], bas: ['bas', 'basse', 'bas', 'basses'], épais: ['épais', 'épaisse', 'épais', 'épaisses'],
+    bon: ['bon', 'bonne', 'bons', 'bonnes'], gentil: ['gentil', 'gentille', 'gentils', 'gentilles'], complet: ['complet', 'complète', 'complets', 'complètes'], discret: ['discret', 'discrète', 'discrets', 'discrètes'], inquiet: ['inquiet', 'inquiète', 'inquiets', 'inquiètes'], secret: ['secret', 'secrète', 'secrets', 'secrètes'], favori: ['favori', 'favorite', 'favoris', 'favorites'] };
+  const adjForms = b => { // masculine, feminine, masculine plural, feminine plural (and the form before a vowel when there is one)
+    if (ADJ_X[b]) return ADJ_X[b];
+    const f = /e$/.test(b) ? b : /eux$/.test(b) ? b.slice(0, -1) + 'se' : /if$/.test(b) ? b.slice(0, -1) + 've' : /er$/.test(b) ? b.slice(0, -2) + 'ère' : /(el|eil|en|on|et)$/.test(b) ? b + b.slice(-1) + 'e' : b + 'e';
+    const mp = /[sx]$/.test(b) ? b : /al$/.test(b) ? b.slice(0, -2) + 'aux' : /eau$/.test(b) ? b + 'x' : b + 's';
+    return [b, f, mp, f + 's'];
+  };
+  const POOLS = {
+    obj: ['le', 'la', "l'", 'les', 'lui', 'leur', 'y', 'en', 'me', 'te', 'nous', 'vous', 'se'], tonic: ['moi', 'toi', 'lui', 'elle', 'nous', 'vous', 'eux', 'elles'],
+    art: ['au', 'aux', 'du', 'des', 'à la', "à l'", 'de la', "de l'", 'de', "d'", 'le', 'la', "l'", 'les', 'un', 'une', 'en'], pos: ['mon', 'ma', 'mes', 'ton', 'ta', 'tes', 'son', 'sa', 'ses', 'notre', 'votre', 'nos', 'vos', 'leur', 'leurs'], dem: ['ce', 'cet', 'cette', 'ces'],
+    deg: ['plus', 'moins', 'aussi', 'autant', 'le plus', 'la plus', 'le moins', 'si', 'tant'], bon: ['meilleur', 'meilleure', 'meilleurs', 'meilleures', 'mieux', 'plus bon', 'le meilleur', 'la meilleure'], bien: ['mieux', 'meilleur', 'plus bien', 'meilleure', 'le mieux'], mal: ['pire', 'plus mauvaise', 'plus mal', 'pires', 'le pire', 'le plus mauvais', 'plus mauvais'],
+    tout: ['tout', 'toute', 'tous', 'toutes']
+  };
+  const RELATED = { pr: ['imp', 'pc', 'fut', 'subj'], pc: ['imp', 'pqp', 'pr'], imp: ['pc', 'pr', 'cond'], fut: ['cond', 'pr', 'subj'], cond: ['fut', 'imp', 'pr'], subj: ['pr', 'imp', 'fut'], imper: ['pr', 'subj'], pqp: ['pc', 'imp', 'cond'] };
+  const verbCands = v => { // the same verb in the other persons of the tense, the same person in neighbouring tenses, the other gender
+    const out = [], add = (tense, p, o) => { try { group(v.inf, tense, p, o).answers.forEach(a => { if (!/null|undefined/.test(a)) out.push(a); }); } catch (e) { /* a form this verb lacks */ } };
+    const persons = v.tense === 'imper' ? [1, 3, 4] : [0, 1, 2, 3, 4, 5];
+    persons.forEach(p => { if (p !== v.p) add(v.tense, p, { g: v.g || 'm', neg: v.neg }); });
+    RELATED[v.tense].forEach(t => { if (t === 'imper' || (v.tense === 'imper' && ![1, 3, 4].includes(v.p))) return; add(t, v.p, { g: v.g || 'm', vous: v.vous, neg: v.neg }); });
+    if (v.tense === 'pc' || v.tense === 'pqp') add(v.tense, v.p, { g: v.g === 'f' ? 'm' : 'f', neg: v.neg });
+    return out;
+  };
+  const itemCands = it => { // the other forms of the base word named in the cue
+    const a = it.answers[0], low = a.toLowerCase(), base = it.cue.replace(/\s*\(.*$/, '').trim();
+    if (it.topic === 'adj') return adjForms(base);
+    if (it.topic === 'pl') return [base + 's', a.replace(/aux$/, 'als'), a.replace(/x$/, 's'), base, a.replace(/eux$/, 'eus'), a.replace(/s$/, 'x'), base + 'x']; // in order of plausibility: the choice mode keeps this order
+    if (it.topic === 'adv') { const f = adjForms(base)[1]; return [base + 'ment', f + 'ment', f.replace(/e$/, 'ément'), base.replace(/[ea]nt$/, 'emment'), base.replace(/[ea]nt$/, 'amment'), base + 'ement']; }
+    if (it.topic === 'ppa') { const pp = table(splitRefl(base).base).pp; return [pp, pp + 'e', pp + 's', pp + 'es']; }
+    if (it.topic === 'tout') return POOLS.tout;
+    if (it.topic === 'pro') { if (/ /.test(low)) { const [x, y] = low.split(' '); return [y + ' ' + x, x + ' ' + 'la', 'la ' + y, 'les ' + y, 'lui ' + x, x + ' leur', 'en ' + x, 'y ' + x]; } return POOLS.tonic.includes(low) ? POOLS.tonic : POOLS.obj; }
+    if (it.topic === 'det') return POOLS.pos.includes(low) ? POOLS.pos : POOLS.dem.includes(low) ? POOLS.dem : POOLS.art;
+    if (it.topic === 'cmp') return POOLS.bon.includes(low) ? POOLS.bon : POOLS.bien.includes(low) ? POOLS.bien : POOLS.mal.includes(low) ? POOLS.mal : POOLS.deg;
+    return [];
+  };
+  const choices = it => { // four options: the answer and three other forms of the same word, the ones that sound like the answer first
+    const ans = it.answers.map(clean), capped = /^\p{Lu}/u.test(it.show), fix = w => capped ? cap(w) : w;
+    const seen = new Set(ans), pool = [];
+    const take = w => { const k = clean(w); if (!k || seen.has(k)) return; seen.add(k); pool.push(w); };
+    (it.kind === 'verb' ? verbCands(it.v) : itemCands(it)).forEach(take);
+    if (pool.length < 3) { const a = it.show.toLowerCase(); [a.replace(/[sx]$/, ''), a.replace(/e$/, ''), a + 's', a + 'e', a + 'x', a.replace(/x$/, 's'), a + 'es'].forEach(take); } // an invariable word: the wrong endings are the lesson
+    const near = A.shuffle(pool.filter(w => sounds(w, it.show))), far = A.shuffle(pool.filter(w => !sounds(w, it.show)));
+    const picked = (it.topic === 'pl' || it.topic === 'adv' ? pool : near.slice(0, 2).concat(far, near.slice(2))).slice(0, 3); // plurals and adverbs: the wrong endings in order of plausibility
+    return A.shuffle(picked.map(fix).concat([it.show]));
+  };
+
   // ---------- the drill ----------
   let F = null;
   const stat = (topic, verdict) => { const S = A.state(); S.stats = S.stats || {}; const all = S.stats.forms = S.stats.forms || {}; const st = all[topic] = all[topic] || { n: 0, ok: 0, acc: 0, snd: 0 }; st.n++; if (verdict === 'ok') st.ok++; if (verdict === 'accent') st.acc++; if (verdict === 'sound') st.snd++; A.save(); };
@@ -156,23 +205,24 @@
   };
   const ACCENTS = ['é', 'è', 'ê', 'à', 'ç', 'ù', 'û', 'î', 'ô', 'œ'];
   views.formdrill = v => {
-    const topic = v.topic || 'all', mode = v.mode === 'hear' ? 'hear' : 'write';
-    if (!F || F.topic !== topic || F.mode !== mode) F = { topic, mode, items: round(topic, 10), i: 0, ok: 0, acc: 0, snd: 0, verdict: null, typed: '' };
+    const topic = v.topic || 'all', mode = v.mode === 'hear' ? 'hear' : v.mode === 'pick' ? 'pick' : 'write';
+    if (!F || F.topic !== topic || F.mode !== mode) { F = { topic, mode, items: round(topic, 10), i: 0, ok: 0, acc: 0, snd: 0, verdict: null, typed: '' }; if (mode === 'pick') F.items.forEach(it => { it.choices = choices(it); }); }
     const it = F.items[F.i], n = F.items.length, name = topic === 'all' ? 'Everything' : topic === 'verbs' ? 'All tenses' : topic === 'agree' ? 'Agreement & small words' : LABEL[topic];
     const head = `<div class="drill-head"><button class="btn ghost" data-go="forms">← Forms</button><div class="bar"><i style="width:${(F.i / n) * 100}%"></i></div><span class="en num">${Math.min(F.i + 1, n)}/${n}</span></div>`;
-    if (!it) return `${head}<div class="card done"><span class="eyebrow">${esc(name)} · ${mode === 'hear' ? 'by ear' : 'written'}</span><b class="num">${F.ok}/${n}</b><p class="en">${F.ok === n ? 'Every form right.' : (F.acc ? F.acc + ' right but for the accents. ' : '') + (F.snd ? F.snd + ' sounded right and were spelt wrong: that is grammar, not hearing. ' : '') + (n - F.ok - F.acc - F.snd ? (n - F.ok - F.acc - F.snd) + ' wrong form' + (n - F.ok - F.acc - F.snd > 1 ? 's' : '') + '.' : '')}</p>
+    if (!it) return `${head}<div class="card done"><span class="eyebrow">${esc(name)} · ${mode === 'hear' ? 'by ear' : mode === 'pick' ? 'chosen' : 'written'}</span><b class="num">${F.ok}/${n}</b><p class="en">${F.ok === n ? 'Every form right.' : (F.acc ? F.acc + ' right but for the accents. ' : '') + (F.snd ? F.snd + ' sounded right and were spelt wrong: that is grammar, not hearing. ' : '') + (n - F.ok - F.acc - F.snd ? (n - F.ok - F.acc - F.snd) + ' wrong form' + (n - F.ok - F.acc - F.snd > 1 ? 's' : '') + '.' : '')}</p>
       <div class="row"><button class="btn primary" id="again">Another ten</button><button class="btn" data-go="forms">Done</button></div></div>
       <div class="card"><span class="eyebrow">This round</span><div style="margin-top:8px">${F.items.map(x => `<div class="sent">${speakBtn(x.full)}<div><div class="fr">${blankHtml(x, x.verdict === 'ok' ? 'ok' : x.verdict === 'accent' || x.verdict === 'sound' ? 'sp' : 'ko')}</div><div class="en" style="font-size:.9rem">${esc(x.en)}</div></div></div>`).join('')}</div></div>`;
     const done = F.verdict !== null, V = F.verdict;
     const verdictText = V === 'ok' ? 'Correct' : V === 'accent' ? 'Right letters, wrong accents' : V === 'sound' ? 'Sounds right, spelt wrong' : 'Not this time';
-    return `${head}<div class="card"><div class="row"><span class="pill lvl">${esc(it.label)}</span><span class="en">${mode === 'hear' ? 'Listen, then write the missing form.' : 'Write the form that fits.'}</span></div>
-      <p class="prompt" style="margin-top:12px">${blankHtml(it, done ? (V === 'ok' ? 'ok' : V === 'accent' || V === 'sound' ? 'sp' : 'ko') : mode)}</p>
+    return `${head}<div class="card"><div class="row"><span class="pill lvl">${esc(it.label)}</span><span class="en">${mode === 'hear' ? 'Listen, then write the missing form.' : mode === 'pick' ? 'Choose the form that fits.' : 'Write the form that fits.'}</span></div>
+      <p class="prompt" style="margin-top:12px">${blankHtml(it, done ? (V === 'ok' ? 'ok' : V === 'accent' || V === 'sound' ? 'sp' : 'ko') : mode === 'pick' ? 'write' : mode)}</p>
+      ${mode === 'pick' ? `<div class="choices">${it.choices.map(c => `<button class="choice fr ${done ? (it.answers.map(clean).includes(clean(c)) ? 'ok' : clean(c) === clean(F.typed) ? 'ko' : '') : ''}" data-ans="${esc(c)}" ${done ? 'disabled' : ''}>${fr(c)}</button>`).join('')}</div>` : ''}
       ${mode === 'hear' ? `<div class="player" style="margin-top:10px"><button class="btn primary" id="play">▶ Play</button><button class="btn" id="slow" title="In breath groups, with a pause between them">Slower</button><span class="en num" id="plays"></span></div>` : ''}
-      <input class="dict" id="ans" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${mode === 'hear' ? 'the missing word or words' : esc(it.cue) + ' → ?'}" ${done ? 'disabled' : ''} value="${done ? esc(F.typed) : ''}" lang="fr">
-      ${done ? '' : `<div class="row" style="margin-top:8px;gap:6px">${ACCENTS.map(c => `<button class="btn ghost chip-acc" data-acc="${c}" tabindex="-1" style="padding:4px 9px;font-family:var(--font-fr);font-size:1.1rem">${c}</button>`).join('')}</div>`}
+      ${mode === 'pick' ? '' : `<input class="dict" id="ans" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${mode === 'hear' ? 'the missing word or words' : esc(it.cue) + ' → ?'}" ${done ? 'disabled' : ''} value="${done ? esc(F.typed) : ''}" lang="fr">
+      ${done ? '' : `<div class="row" style="margin-top:8px;gap:6px">${ACCENTS.map(c => `<button class="btn ghost chip-acc" data-acc="${c}" tabindex="-1" style="padding:4px 9px;font-family:var(--font-fr);font-size:1.1rem">${c}</button>`).join('')}</div>`}`}
       ${done ? `<div class="result ${V === 'ok' ? 'ok' : 'ko'}" ${V === 'accent' || V === 'sound' ? 'style="background:var(--warn-soft);color:var(--warn)"' : ''}>${verdictText}<b class="fr" style="font-weight:600;display:block">${fr(it.show)}</b>${it.answers.length > 1 ? `<span class="en">also accepted: ${it.answers.slice(1).map(esc).join(', ')}</span>` : ''}
           <span class="fr">${fr(it.full)} ${speakBtn(it.full)}</span><span class="en">${esc(it.en)}</span><span class="en" style="margin-top:6px">${esc(it.note)}</span></div>
-        <div class="actions"><button class="btn primary" id="next">${F.i + 1 < n ? 'Next' : 'Finish'}</button></div>` : `<div class="actions"><button class="btn primary" id="check">Check</button></div>`}
+        <div class="actions"><button class="btn primary" id="next">${F.i + 1 < n ? 'Next' : 'Finish'}</button></div>` : mode === 'pick' ? '' : `<div class="actions"><button class="btn primary" id="check">Check</button></div>`}
     </div>`;
   };
   views.formdrill.after = v => {
@@ -181,32 +231,34 @@
     const inp = $('ans'); let plays = 0;
     const play = slow => { TTS.stop(); TTS.speak(it.full, slow ? { slow: true } : {}); plays++; if ($('plays')) $('plays').textContent = plays + ' play' + (plays > 1 ? 's' : ''); };
     if ($('play')) { $('play').addEventListener('click', () => play(false)); $('slow').addEventListener('click', () => play(true)); }
-    if (F.verdict === null) {
+    const settle = (typed, verdict) => { F.typed = typed; F.verdict = verdict; it.verdict = verdict; if (verdict === 'ok') F.ok++; if (verdict === 'accent') F.acc++; if (verdict === 'sound') F.snd++; stat(it.topic, verdict); A.render(); if (F.mode === 'write' || F.mode === 'pick' || verdict !== 'ok') TTS.speak(it.full); };
+    if (F.verdict === null && F.mode === 'pick') document.querySelectorAll('[data-ans]').forEach(b => b.addEventListener('click', () => settle(b.dataset.ans, it.answers.map(clean).includes(clean(b.dataset.ans)) ? 'ok' : 'ko')));
+    if (F.verdict === null && inp) {
       if (F.mode === 'hear') play(false);
       inp.focus(); inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('check').click(); } });
       document.querySelectorAll('.chip-acc').forEach(b => b.addEventListener('mousedown', e => { e.preventDefault(); const s = inp.selectionStart || 0; inp.setRangeText(b.dataset.acc, s, inp.selectionEnd || s, 'end'); inp.focus(); }));
-      $('check').addEventListener('click', () => { F.typed = inp.value; F.verdict = judge(it, inp.value); it.verdict = F.verdict; if (F.verdict === 'ok') F.ok++; if (F.verdict === 'accent') F.acc++; if (F.verdict === 'sound') F.snd++; stat(it.topic, F.verdict); A.render(); if (F.mode === 'write' || F.verdict !== 'ok') TTS.speak(it.full); });
+      $('check').addEventListener('click', () => settle(inp.value, judge(it, inp.value)));
     }
     if ($('next')) $('next').addEventListener('click', () => { TTS.stop(); F.i++; F.verdict = null; F.typed = ''; A.render(); window.scrollTo(0, 0); });
   };
 
   // ---------- the menu ----------
   views.forms = v => {
-    const S = A.state(), st = (S.stats || {}).forms || {}, mode = (v.mode || S.settings.formsMode) === 'hear' ? 'hear' : 'write';
+    const S = A.state(), st = (S.stats || {}).forms || {}, m0 = v.mode || S.settings.formsMode, mode = m0 === 'hear' ? 'hear' : m0 === 'pick' ? 'pick' : 'write';
     const pct = k => { const x = st[k]; return x && x.n ? Math.round(100 * x.ok / x.n) : null; };
     const chip = (k, label, sub) => { const p = pct(k); return `<button class="mode" data-topic="${k}"><b>${esc(label)}</b><span>${sub ? esc(sub) + ' · ' : ''}${p === null ? 'new' : p + '% of ' + st[k].n}</span></button>`; };
     const tot = Object.values(st).reduce((a, x) => ({ n: a.n + x.n, ok: a.ok + x.ok, acc: a.acc + (x.acc || 0), snd: a.snd + (x.snd || 0) }), { n: 0, ok: 0, acc: 0, snd: 0 });
-    return `<div class="lesson-head"><div class="row"><button class="btn ghost" data-go="listen">← Listening</button></div><span class="eyebrow">Forms in sentences</span><h1>Conjugation &amp; agreement</h1>
-      <p class="en">Every item is a sentence with one form missing: a verb to conjugate, an adjective to agree, a plural, an adverb, a pronoun, an article. In <b>Write</b> you see the base form and the tense and type the form. In <b>Hear</b> you hear the whole sentence and write what filled the gap: endings that sound alike (parlé, parlait, parlaient) are told apart only by grammar, which is the point.</p>
+    return `<div class="lesson-head"><span class="eyebrow">Forms in sentences</span><h1>Conjugation &amp; agreement</h1>
+      <p class="en">Every item is a sentence with one form missing: a verb to conjugate, an adjective to agree, a plural, an adverb, a pronoun, an article. <b>Choose</b> offers four forms of the same word, the ones that sound alike first. <b>Write</b> shows the base form and the tense and you type the form. <b>Hear</b> plays the whole sentence and you write what filled the gap: endings that sound alike (parlé, parlait, parlaient) are told apart only by grammar, which is the point.</p>
       ${tot.n ? `<p class="en num">${tot.n} forms so far · ${Math.round(100 * tot.ok / tot.n)}% right${tot.acc ? ' · ' + tot.acc + ' accent slips' : ''}${tot.snd ? ' · ' + tot.snd + ' sounded right, spelt wrong' : ''}</p>` : ''}</div>
-    <div class="card"><div class="row"><span class="eyebrow">Mode</span><button class="btn ${mode === 'write' ? 'on' : ''}" data-mode="write">Write the form</button><button class="btn ${mode === 'hear' ? 'on' : ''}" data-mode="hear">Hear it, then write</button></div>
+    <div class="card"><div class="row"><span class="eyebrow">Mode</span><button class="btn ${mode === 'pick' ? 'on' : ''}" data-mode="pick">Choose the form</button><button class="btn ${mode === 'write' ? 'on' : ''}" data-mode="write">Write the form</button><button class="btn ${mode === 'hear' ? 'on' : ''}" data-mode="hear">Hear it, then write</button></div>
       <div class="row" style="margin-top:12px"><button class="btn primary" data-topic="all">Everything, ten at a time</button><button class="btn" data-topic="verbs">All tenses</button><button class="btn" data-topic="agree">Agreement &amp; small words</button></div></div>
     <div class="card"><span class="eyebrow">Verbs</span><div class="modes" style="margin-top:10px">${TOPICS.slice(0, 8).map(t => chip(t[0], t[1], D.frames.filter(f => f[0] === t[0]).length + ' frames')).join('')}</div></div>
     <div class="card"><span class="eyebrow">Agreement &amp; small words</span><div class="modes" style="margin-top:10px">${TOPICS.slice(8).map(t => chip(t[0], t[1], D.items.filter(i => i[0] === t[0]).length + ' items')).join('')}</div></div>`;
   };
   views.forms.after = v => {
     document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => { const S = A.state(); S.settings.formsMode = b.dataset.mode; A.save(); go('forms', { mode: b.dataset.mode }); }));
-    document.querySelectorAll('[data-topic]').forEach(b => b.addEventListener('click', () => { const S = A.state(); F = null; go('formdrill', { topic: b.dataset.topic, mode: (v.mode || S.settings.formsMode) === 'hear' ? 'hear' : 'write' }); }));
+    document.querySelectorAll('[data-topic]').forEach(b => b.addEventListener('click', () => { const S = A.state(), m = v.mode || S.settings.formsMode; F = null; go('formdrill', { topic: b.dataset.topic, mode: m === 'hear' ? 'hear' : m === 'pick' ? 'pick' : 'write' }); }));
   };
-  A.forms = { table, group, fromFrame, fromItem, round, judge, pool, TOPICS, T, state: () => F };
+  A.forms = { table, group, fromFrame, fromItem, round, judge, pool, choices, adjForms, TOPICS, T, state: () => F };
 })();
