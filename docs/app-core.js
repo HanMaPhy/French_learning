@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1'];
-  const BUILD = 16; // bump together with the ?v= on the script tags in index.html whenever the scripts change
+  const BUILD = 17; // bump together with the ?v= on the script tags in index.html whenever the scripts change
 
   // ---------- merge data files into one book ----------
   const BOOK = [];
@@ -181,12 +181,15 @@
       const n = v.name;
       let r = /fr[-_]FR/i.test(v.lang) ? 100 : 50;
       if (/(Natural|Neural|Online|Premium|Enhanced|Google|Siri|Wavenet)/i.test(n)) r += 30;
+      const q = this.quality(v); r += q === 'premium' ? 40 : q === 'enhanced' ? 30 : q === 'siri' ? 35 : q === 'compact' ? -5 : 0; // iOS names carry no tier: the URI does
       if (/(Audrey|Aur[eé]lie|Thomas|Marie|Daniel|Denise|Henri|Hortense|Julie|Paul|Vivienne|Charline|Yvette|Claude|R[eé]my|L[eé]a|Chantal|Nicolas|Am[eé]lie|Jacques)/i.test(n)) r += 10;
       if (/^Thomas\b/i.test(n)) r += 1; // the classic Apple default, ahead of its siblings
       if (/(Eddy|Flo|Grandma|Grandpa|Reed|Rocko|Sandy|Shelley|Bells|Bubbles|Cellos|Jester|Organ|Superstar|Trinoids|Whisper|Zarvox|Bad News|Good News|Albert|Fred|Junior|Kathy|Ralph|Wobble|compact|Eloquence)/i.test(n)) r -= 60;
       if (v.localService) r += 1;
       return r;
     },
+    quality(v) { const u = String(v.voiceURI || '').toLowerCase(); return /premium/.test(u) ? 'premium' : /enhanced/.test(u) ? 'enhanced' : /siri/.test(u) ? 'siri' : /compact/.test(u) ? 'compact' : ''; }, // Apple: com.apple.voice.premium.fr-FR.Audrey
+    label(v) { const q = this.quality(v); return v.name + (q && !new RegExp(q, 'i').test(v.name) ? ' · ' + q[0].toUpperCase() + q.slice(1) : ''); },
     voice() { if (!this.voices.length) this.refresh(); return this.voices.find(x => x.name === S.settings.voice) || this.voices[0] || null; },
     noFrench() { return this.supported() && this.all.length > 0 && this.voices.length === 0; },
     ready() {
@@ -410,12 +413,12 @@
   function openSettings() {
     TTS.refresh();
     const ov = document.createElement('div'); ov.className = 'overlay';
-    const opts = TTS.voices.map(v => `<option value="${esc(v.name)}" ${S.settings.voice === v.name ? 'selected' : ''}>${esc(v.name)} (${esc(v.lang)})</option>`).join('');
+    const opts = TTS.voices.map(v => `<option value="${esc(v.name)}" ${S.settings.voice === v.name ? 'selected' : ''}>${esc(TTS.label(v))} (${esc(v.lang)})</option>`).join('');
     const auto = TTS.voices.some(x => x.name === S.settings.voice) ? null : TTS.voice(); // what Automatic resolves to right now
     const syncText = { local: 'Progress is saved in this browser.', cloud: 'Progress is saved to your account and in this browser.', error: 'Cloud sync failed; progress is still saved in this browser.' }[sync.status];
     ov.innerHTML = `<div class="dialog" role="dialog" aria-label="Settings">
       <div class="row" style="justify-content:space-between"><h2>Settings</h2><button class="btn ghost" id="closeSet">Close</button></div>
-      <div class="field"><label for="voiceSel">French voice</label><select id="voiceSel"><option value="">Automatic${auto ? ' · ' + esc(auto.name) : ''}</option>${opts}</select>
+      <div class="field"><label for="voiceSel">French voice</label><select id="voiceSel"><option value="">Automatic${auto ? ' · ' + esc(TTS.label(auto)) : ''}</option>${opts}</select>
         <span class="en" style="font-size:.88rem">${TTS.voices.length ? TTS.voices.length + ' French voice' + (TTS.voices.length > 1 ? 's' : '') + ' found, best first; Eddy, Flo, Grandma and the like are novelty voices. For the most natural reading: Chrome has Google français, Edge has Denise (Natural), and on a Mac or iPhone you can download Audrey (Premium) or Aurélie (Enhanced) in the system speech settings.' : 'No French voice found yet. Install one in the system speech settings (Mac or iPhone: Audrey, Aurélie or Thomas), then reload. Chrome and Edge bring their own French voices.'}</span></div>
       <div class="field"><label for="rateSel">Speed <span class="num" id="rateVal">${S.settings.rate.toFixed(2)}×</span></label><input type="range" id="rateSel" min="0.5" max="1.2" step="0.05" value="${S.settings.rate}">
         <span class="en" style="font-size:.88rem">Speed is a request to the voice, not a command: Apple's Premium and Enhanced voices in particular barely change pace with it. The Slower button in Dictation and Listen &amp; pick, and Slow on a passage, do not depend on it: they read in breath groups with a pause between them, at a reduced speed, so they are slower with every voice.</span></div>

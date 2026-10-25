@@ -109,6 +109,14 @@
     check(okStopped === false && said.length === 1, 'stop() ends a slow reading after the current group');
     A.TTS.say = realSay; A.TTS.gaps = realGaps;
 
+    log('— voice ranking —');
+    { const mk = (name, uri, lang) => ({ name, voiceURI: uri, lang: lang || 'fr-FR', localService: true });
+      const ios = [mk('Thomas', 'com.apple.voice.compact.fr-FR.Thomas'), mk('Audrey', 'com.apple.voice.premium.fr-FR.Audrey'), mk('Aurélie', 'com.apple.voice.enhanced.fr-FR.Aurelie'), mk('Eddy', 'com.apple.eloquence.fr-FR.Eddy'), mk('Amélie', 'com.apple.voice.compact.fr-CA.Amelie', 'fr-CA')];
+      const order = ios.slice().sort((a, b) => A.TTS.rank(b) - A.TTS.rank(a)).map(v => v.name);
+      check(order.join(' ') === 'Audrey Aurélie Thomas Amélie Eddy', 'iOS voices, no tier in the name: premium Audrey first, then enhanced, then compact (' + order.join(' > ') + ')');
+      check(A.TTS.label(ios[1]) === 'Audrey · Premium' && A.TTS.label(mk('Audrey (Premium)', 'com.apple.voice.premium.fr-FR.Audrey')) === 'Audrey (Premium)' && A.TTS.label(ios[0]) === 'Thomas · Compact', 'the tier is shown once in the label');
+      const mac = [mk('Thomas', 'com.apple.voice.compact.fr-FR.Thomas'), mk('Audrey (Premium)', 'com.apple.voice.premium.fr-FR.Audrey'), mk('Google français', 'Google français', 'fr-FR')];
+      check(mac.slice().sort((a, b) => A.TTS.rank(b) - A.TTS.rank(a))[0].name === 'Audrey (Premium)', 'a Mac still prefers the premium voice'); }
     log('— readings —');
     const RD = A.READING, rids = Object.keys(RD), lids = Object.keys(A.LESSONS);
     check(rids.length === 30 && lids.every(id => RD[id]), rids.length + ' readings, one per lesson' + (lids.some(id => !RD[id]) ? ' (missing: ' + lids.filter(id => !RD[id]).join(' ') + ')' : ''));
