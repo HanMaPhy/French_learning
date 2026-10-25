@@ -221,7 +221,8 @@ input.dict{width:100%;font:inherit;font-size:1.25rem;padding:10px 12px;border:1p
 /* settings dialog */
 .overlay{position:fixed;inset:0;background:rgba(10,12,20,.45);display:flex;align-items:flex-end;justify-content:center;z-index:20;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 @media (min-width:600px){.overlay{align-items:center}}
-.dialog{background:var(--surface);border-radius:14px 14px 0 0;width:100%;max-width:520px;padding:20px;display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow);margin-bottom:0}
+.dialog{background:var(--surface);border-radius:14px 14px 0 0;width:100%;max-width:520px;padding:20px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow);margin-bottom:0;min-width:0;max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.field select{width:100%;min-width:0;text-overflow:ellipsis} /* a long voice name must not widen the dialog past the phone */
 @media (min-width:600px){.dialog{border-radius:14px}}
 .field{display:flex;flex-direction:column;gap:6px}
 .field label{font-weight:600;font-size:.9rem}
@@ -260,27 +261,27 @@ select,input[type=text]{font:inherit;padding:8px 10px;border:1px solid var(--lin
   <div class="card"><p class="en">Loading the book…</p></div>
 </main>
 
-<script src="data/vocab-a1.js?v=15"></script>
-<script src="data/vocab-a1b.js?v=15"></script>
-<script src="data/vocab-a2.js?v=15"></script>
-<script src="data/vocab-a2b.js?v=15"></script>
-<script src="data/vocab-b1.js?v=15"></script>
-<script src="data/vocab-b1b.js?v=15"></script>
-<script src="data/vocab-b2.js?v=15"></script>
-<script src="data/vocab-b2b.js?v=15"></script>
-<script src="data/vocab-c1.js?v=15"></script>
-<script src="data/vocab-c1b.js?v=15"></script>
-<script src="data/listening.js?v=15"></script>
-<script src="data/reading-a1.js?v=15"></script>
-<script src="data/reading-a2.js?v=15"></script>
-<script src="data/reading-b1.js?v=15"></script>
-<script src="data/reading-b2.js?v=15"></script>
-<script src="data/reading-c1.js?v=15"></script>
-<script src="data/forms.js?v=15"></script>
-<script src="app-core.js?v=15"></script>
-<script src="app-listen.js?v=15"></script>
-<script src="app-drills.js?v=15"></script>
-<script src="app-reading.js?v=15"></script>
-<script src="app-audio.js?v=15"></script>
-<script src="app-mine.js?v=15"></script>
-<script src="app-forms.js?v=15"></script>
+<script src="data/vocab-a1.js?v=16"></script>
+<script src="data/vocab-a1b.js?v=16"></script>
+<script src="data/vocab-a2.js?v=16"></script>
+<script src="data/vocab-a2b.js?v=16"></script>
+<script src="data/vocab-b1.js?v=16"></script>
+<script src="data/vocab-b1b.js?v=16"></script>
+<script src="data/vocab-b2.js?v=16"></script>
+<script src="data/vocab-b2b.js?v=16"></script>
+<script src="data/vocab-c1.js?v=16"></script>
+<script src="data/vocab-c1b.js?v=16"></script>
+<script src="data/listening.js?v=16"></script>
+<script src="data/reading-a1.js?v=16"></script>
+<script src="data/reading-a2.js?v=16"></script>
+<script src="data/reading-b1.js?v=16"></script>
+<script src="data/reading-b2.js?v=16"></script>
+<script src="data/reading-c1.js?v=16"></script>
+<script src="data/forms.js?v=16"></script>
+<script src="app-core.js?v=16"></script>
+<script src="app-listen.js?v=16"></script>
+<script src="app-drills.js?v=16"></script>
+<script src="app-reading.js?v=16"></script>
+<script src="app-audio.js?v=16"></script>
+<script src="app-mine.js?v=16"></script>
+<script src="app-forms.js?v=16"></script>
