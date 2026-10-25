@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1'];
-  const BUILD = 18; // bump together with the ?v= on the script tags in index.html whenever the scripts change
+  const BUILD = 19; // bump together with the ?v= on the script tags in index.html whenever the scripts change
 
   // ---------- merge data files into one book ----------
   const BOOK = [];
@@ -118,10 +118,28 @@
     const deep = (a, b) => { Object.entries(b || {}).forEach(([k, v]) => { if (v && typeof v === 'object') a[k] = deep(a[k] && typeof a[k] === 'object' ? a[k] : {}, v); else if (typeof v === 'number') a[k] = mx(a[k], v); else if (a[k] === undefined) a[k] = v; }); return a; };
     S.stats = deep(S.stats || {}, inc.stats);
     S.bundled = Object.assign(S.bundled || {}, inc.bundled || {});
-    Object.values(inc.texts || {}).forEach(t => { if (!t || !t.id) return; const l = S.texts[t.id]; if (!l || (l.updated || 0) < (t.updated || 0)) { S.texts[t.id] = Object.assign({}, t, { synced: false }); pushText(S.texts[t.id]); nt++; } });
+    // a text already here under another id (the private build's bundled copy of a text the other device imported) is one text: its notes, marks and explanation fold into the copy here
+    const byKey = {}; Object.values(S.texts).forEach(t => { byKey[textKey(t.text)] = t; });
+    Object.values(inc.texts || {}).forEach(t => {
+      if (!t || !t.id || typeof t.text !== 'string') return;
+      const l = S.texts[t.id];
+      if (l) { if ((l.updated || 0) < (t.updated || 0)) { S.texts[t.id] = Object.assign({}, t, { synced: false }); pushText(S.texts[t.id]); nt++; } return; }
+      const twin = byKey[textKey(t.text)];
+      if (twin) { if (foldText(twin, t)) { twin.updated = Date.now(); twin.synced = false; pushText(twin); nt++; } return; }
+      S.texts[t.id] = Object.assign({}, t, { synced: false }); byKey[textKey(t.text)] = S.texts[t.id]; pushText(S.texts[t.id]); nt++;
+    });
     return nw + ' word' + (nw === 1 ? '' : 's') + ' and ' + nt + ' text' + (nt === 1 ? '' : 's') + ' merged';
   }
   const textKey = text => norm(paragraphs(text).join(' ')).slice(0, 200);
+  const foldText = (a, b) => { // what b has and a lacks goes into a: the longer notes, marks a has no mark for, an explanation, a real title, the recording's name; true when a changed
+    let c = false;
+    if (b.notes && (!a.notes || b.notes.length > a.notes.length)) { a.notes = b.notes; c = true; }
+    if (!a.ex && b.ex) { a.ex = b.ex; c = true; }
+    if (b.marks && typeof b.marks === 'object') { const m = Object.assign({}, a.marks || {}); Object.entries(b.marks).forEach(([k, v]) => { if (!m[k]) { m[k] = v; c = true; } }); if (c) a.marks = m; }
+    if (a.autoTitle && !b.autoTitle && b.title) { a.title = b.title; a.autoTitle = false; c = true; }
+    ['audio', 'level', 'src'].forEach(k => { if (!a[k] && b[k]) { a[k] = b[k]; c = true; } });
+    return c;
+  };
   const textFrom = (t, n) => { // one text from an import file or the private bundle, in the shape Mine stores; null when there is nothing in it
     if (!t || typeof t.text !== 'string' || !t.text.trim()) return null;
     const ps = paragraphs(t.text); if (!ps.length) return null;

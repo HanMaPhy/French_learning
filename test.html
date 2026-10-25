@@ -253,6 +253,10 @@
       const id = Object.values(S().texts).find(t => t.title === 'Privé 2').id; A.texts.remove(id); const n3 = A.preloadTexts(bundle);
       check(n3 === 0 && !S().texts[id], 'a bundled text deleted in Mine stays deleted');
       const t1 = Object.values(S().texts).find(t => t.title === 'Privé 1'); check(t1 && t1.audio === 'Leçon 99.mp3' && S().bundled && Object.keys(S().bundled).length >= 2, 'the bundle keeps the recording name and the keys are remembered');
+      const n4 = Object.keys(S().texts).length, twin = { id: 'zzz-other-device', title: 'Les échanges', autoTitle: false, text: 'Bonjour tout le monde. Ça va ?', notes: 'ma note', marks: { 0: [1, 2] }, updated: 5, audio: 'Leçon 99.mp3' };
+      A.importData({ state: { v: 2, words: {}, settings: {}, texts: { [twin.id]: twin } } }); const t1b = S().texts[t1.id];
+      check(Object.keys(S().texts).length === n4 && !S().texts[twin.id] && t1b.notes === 'ma note' && t1b.marks && t1b.marks[0] && t1b.title === 'Privé 1', 'a backup\'s copy of a bundled text folds into it: notes and marks, the bundle\'s own title stays, no duplicate (' + Object.keys(S().texts).length + '/' + n4 + ' ' + t1b.notes + ' ' + JSON.stringify(t1b.marks) + ' ' + t1b.title + ')');
+      const u1 = t1b.updated; A.importData({ state: { v: 2, words: {}, settings: {}, texts: { [twin.id]: twin } } }); check(S().texts[t1.id].updated === u1 && Object.keys(S().texts).length === n4, 'folding the same backup again changes nothing');
       A.texts.remove(t1.id); }
     log('— my texts —');
     const PG = A.paragraphs('Bonjour !\r\n\nÇa va ?   Oui.\n\n\n« Salut »');
