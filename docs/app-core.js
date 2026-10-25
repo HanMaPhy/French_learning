@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1'];
-  const BUILD = 12; // bump together with the ?v= on the script tags in index.html whenever the scripts change
+  const BUILD = 13; // bump together with the ?v= on the script tags in index.html whenever the scripts change
 
   // ---------- merge data files into one book ----------
   const BOOK = [];
@@ -274,7 +274,7 @@
     const fn = views[V.name] || views.book;
     app.innerHTML = fn(V) || '';
     if (fn.after) fn.after(V);
-    const top = { lesson: 'book', reading: 'book', mytext: 'mine', dictee: 'listen', numbers: 'listen', drill: V.from === 'review' ? 'review' : V.from === 'listen' ? 'listen' : 'book', passage: 'listen' }[V.name] || V.name;
+    const top = { lesson: 'book', reading: 'book', mytext: 'mine', dictee: 'listen', numbers: 'listen', forms: 'listen', formdrill: 'listen', drill: V.from === 'review' ? 'review' : V.from === 'listen' ? 'listen' : 'book', passage: 'listen' }[V.name] || V.name;
     document.querySelectorAll('#nav button').forEach(b => { if (b.dataset.view === top) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
   }
   document.getElementById('nav').addEventListener('click', e => { const b = e.target.closest('button[data-view]'); if (b) go(b.dataset.view); });

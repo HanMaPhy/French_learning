@@ -23,12 +23,14 @@
 <script src="data/reading-b1.js"></script>
 <script src="data/reading-b2.js"></script>
 <script src="data/reading-c1.js"></script>
+<script src="data/forms.js"></script>
 <script src="app-core.js"></script>
 <script src="app-listen.js"></script>
 <script src="app-drills.js"></script>
 <script src="app-reading.js"></script>
 <script src="app-audio.js"></script>
 <script src="app-mine.js"></script>
+<script src="app-forms.js"></script>
 <script>
 (async function () {
   const L = [], FULL = []; let fails = 0;
@@ -175,8 +177,43 @@
     check(TK('time', '17h45') === '1745' && TK('time', '17:45') === '1745' && TK('time', '1745') === '1745' && TK('time', '8h') === '0800' && TK('time', 'midi') === '1200', 'typed times: 17h45, 17:45, 1745, 8h, midi');
     check(TK('price', '32,60') === '3260' && TK('price', '32.6') === '3260' && TK('price', '32€60') === '3260' && TK('price', '3260').split('|').includes('3260') && TK('price', '32').split('|').includes('3200'), 'typed prices: 32,60 · 32.6 · 32€60 · 3260 · 32');
     check(TK('date', '23/10/2026') === '23102026' && TK('date', '23 octobre 2026') === '23102026' && TK('date', '1er mars') === '0103' && TK('phone', '06.42.18.73.95') === '0642187395' && TK('year', 'en 1995') === '1995', 'typed dates, phone numbers and years');
-    let genBad = null; for (let k = 0; k < 300 && !genBad; k++) { const it = A.numbers.gen[Object.keys(A.numbers.gen)[k % 6]](); if (!A.numbers.accepts(it, A.numbers.answerFor(it))) genBad = it; }
+    let genBad = null; for (let k = 0; k < 300 && !genBad; k++) { const it = A.numbers.gen[A.numbers.KINDS[k % A.numbers.KINDS.length]](); if (!A.numbers.accepts(it, A.numbers.answerFor(it))) genBad = it; }
     check(!genBad, genBad ? 'generated ' + genBad.kind + ' « ' + genBad.say + ' » rejects its own answer ' + A.numbers.answerFor(genBad) : '300 generated items accept their own answer');
+    const OF = A.numbers.ordFr, ofBad = [[1, 'premier'], [2, 'deuxième'], [4, 'quatrième'], [5, 'cinquième'], [9, 'neuvième'], [11, 'onzième'], [19, 'dix-neuvième'], [20, 'vingtième'], [21, 'vingt et unième'], [80, 'quatre-vingtième']].filter(p => OF(p[0]) !== p[1]);
+    check(ofBad.length === 0 && NF(2300000) === 'deux millions trois cent mille' && NF(1e9) === 'un milliard' && NF(450000) === 'quatre cent cinquante mille', 'ordinals and millions in words' + (ofBad.length ? ': ' + ofBad.map(p => p[0] + ' → ' + OF(p[0])).join(', ') : ''));
+    check(TK('percent', '12,5 %') === '12.5' && TK('temp', 'moins 7') === '-7' && TK('temp', '-7°') === '-7' && TK('temp', '37,5') === '37.5' && TK('hours', '9h 18h30') === '0900 1830' && TK('hours', '9h-18h30') === '0900 1830' && TK('hours', '9:00 à 18:30') === '0900 1830' && TK('two', '35, 12') === '35 12' && TK('measure', '1,82') === '182' && TK('big', '67 000 000') === '67000000', 'typed percentages, temperatures, opening hours, pairs, heights and large numbers');
+    check(A.numbers.KINDS.length >= 14, A.numbers.KINDS.length + ' kinds of number');
+
+    log('— forms —');
+    const G = (inf, tense, p, o) => A.forms.group(inf, tense, p, o || {}).text;
+    const cases = [['manger', 'pr', 3, 'mangeons'], ['commencer', 'pr', 3, 'commençons'], ['manger', 'imp', 0, 'mangeais'], ['manger', 'imp', 3, 'mangions'], ['commencer', 'imp', 2, 'commençait'],
+      ['acheter', 'pr', 0, 'achète'], ['acheter', 'fut', 0, 'achèterai'], ['préférer', 'pr', 2, 'préfère'], ['préférer', 'fut', 2, 'préférera'], ['appeler', 'pr', 5, 'appellent'], ['appeler', 'fut', 3, 'appellerons'], ['jeter', 'pr', 0, 'jette'], ['se promener', 'pr', 2, 'se promène'],
+      ['payer', 'pr', 2, 'paie'], ['payer', 'pr', 3, 'payons'], ['envoyer', 'fut', 0, 'enverrai'], ['essayer', 'subj', 3, 'essayions'], ['entrer', 'pr', 0, 'entre'], ['rester', 'pr', 2, 'reste'],
+      ['finir', 'pr', 3, 'finissons'], ['finir', 'subj', 0, 'finisse'], ['attendre', 'pr', 2, 'attend'], ['attendre', 'pc', 0, 'ai attendu'], ['attendre', 'fut', 0, 'attendrai'],
+      ['être', 'imp', 3, 'étions'], ['être', 'subj', 2, 'soit'], ['avoir', 'subj', 3, 'ayons'], ['aller', 'pc', 2, 'est allé', { g: 'm' }], ['aller', 'pc', 2, 'est allée', { g: 'f' }], ['aller', 'pc', 5, 'sont allées', { g: 'f' }], ['aller', 'subj', 3, 'allions'], ['aller', 'imper', 1, 'va'], ['aller', 'fut', 0, 'irai'],
+      ['faire', 'subj', 3, 'fassions'], ['faire', 'imp', 0, 'faisais'], ['pouvoir', 'subj', 0, 'puisse'], ['savoir', 'imper', 4, 'sachez'], ['vouloir', 'subj', 3, 'voulions'], ['vouloir', 'subj', 5, 'veuillent'],
+      ['venir', 'pr', 5, 'viennent'], ['venir', 'pc', 2, 'est venue', { g: 'f' }], ['venir', 'fut', 0, 'viendrai'], ['se souvenir', 'pr', 0, 'me souviens'], ['se souvenir', 'pc', 0, 'me suis souvenu', { g: 'm' }], ['obtenir', 'pc', 2, 'a obtenu'],
+      ['prendre', 'pr', 5, 'prennent'], ['comprendre', 'pc', 0, 'ai compris'], ['mettre', 'pr', 2, 'met'], ['promettre', 'pc', 2, 'a promis'],
+      ['partir', 'pr', 0, 'pars'], ['partir', 'pc', 5, 'sont partis', { g: 'm' }], ['dormir', 'pr', 3, 'dormons'], ['connaître', 'pr', 2, 'connaît'], ['connaître', 'pc', 0, 'ai connu'],
+      ['écrire', 'pr', 3, 'écrivons'], ['écrire', 'pc', 2, 'a écrit'], ['conduire', 'pr', 5, 'conduisent'], ['craindre', 'pr', 3, 'craignons'], ['peindre', 'pc', 2, 'a peint'], ['recevoir', 'pr', 0, 'reçois'], ['recevoir', 'fut', 2, 'recevra'],
+      ['ouvrir', 'pr', 0, 'ouvre'], ['ouvrir', 'pc', 2, 'a ouvert'], ['ouvrir', 'imper', 1, 'ouvre'], ['offrir', 'pc', 0, 'ai offert'],
+      ['se lever', 'pr', 0, 'me lève'], ['se lever', 'pc', 2, "s'est levée", { g: 'f' }], ['se lever', 'imper', 1, 'lève-toi'], ['se lever', 'imper', 4, 'levez-vous'], ['se lever', 'imper', 1, 'ne te lève pas', { neg: 1 }],
+      ["s'appeler", 'pr', 0, "m'appelle"], ["s'appeler", 'pr', 4, 'vous appelez'], ["s'appeler", 'imp', 2, "s'appelait"], ["s'inquiéter", 'pr', 0, "m'inquiète"],
+      ['avoir', 'pc', 0, "n'ai pas eu", { neg: 1 }], ['aller', 'pc', 0, 'ne suis pas allé', { neg: 1, g: 'm' }], ['oublier', 'imper', 1, "n'oublie pas", { neg: 1 }], ['se coucher', 'imper', 4, 'ne vous couchez pas', { neg: 1 }], ['savoir', 'pr', 0, 'ne sais pas', { neg: 1 }],
+      ['finir', 'pqp', 2, 'avait fini'], ['partir', 'pqp', 5, 'étaient parties', { g: 'f' }], ['devoir', 'cond', 0, 'devrais'], ['falloir', 'cond', 2, 'faudrait'], ['pleuvoir', 'fut', 2, 'pleuvra'], ['naître', 'pc', 2, 'est née', { g: 'f' }], ['mourir', 'pc', 2, 'est mort', { g: 'm' }], ['vivre', 'pc', 0, 'ai vécu'], ['boire', 'subj', 3, 'buvions'], ['voir', 'subj', 0, 'voie'], ['croire', 'imp', 5, 'croyaient'], ['dire', 'pr', 4, 'dites'], ['lire', 'pc', 0, 'ai lu'], ['descendre', 'pc', 2, 'est descendue', { g: 'f' }], ['voyager', 'imp', 2, 'voyageait'], ['réussir', 'subj', 2, 'réussisse'], ['jouer', 'imp', 5, 'jouaient']];
+    const cBad = cases.filter(c => G(c[0], c[1], c[2], c[4]) !== c[3]);
+    check(cBad.length === 0, cases.length + ' conjugated forms' + (cBad.length ? ': ' + cBad.map(c => c[0] + ' ' + c[1] + ' ' + c[2] + ' → ' + G(c[0], c[1], c[2], c[4]) + ' (expected ' + c[3] + ')').join('; ') : ''));
+    const vous = A.forms.group('aller', 'pc', 4, { vous: 1 }).answers, je = A.forms.group('aller', 'pc', 0, {}).answers;
+    check(vous.length === 4 && je.length === 2 && je.includes('suis allée'), 'unknown gender or number accepts every agreement (vous: ' + vous.join(' / ') + ')');
+    let fBad = [], fCount = 0;
+    A.forms.pool && window.FR_FORMS.frames.forEach(f => { A.forms.pool(f).forEach(s => { fCount++; for (let k = 0; k < 3; k++) { const it = A.forms.fromFrame(f); if (/[{}]/.test(it.full + it.en + it.blank) || !it.answers.length || it.answers.some(a => !a || /undefined|null/.test(a)) || it.blank.split('___').length !== 2 || !it.full.toLowerCase().includes(it.show.toLowerCase()) || /\bje [aeiouyéèêâàh]/i.test(it.full) || / ,/.test(it.full)) fBad.push(it.full + ' | ' + it.blank + ' | ' + it.en + ' | ' + it.answers.join('/')); } }); });
+    check(fBad.length === 0, window.FR_FORMS.frames.length + ' frames × ' + fCount + ' subjects generate clean sentences' + (fBad.length ? ': ' + fBad.slice(0, 4).join(' ;; ') : ''));
+    const iBad = window.FR_FORMS.items.filter(x => { const it = A.forms.fromItem(x); return x[1].split('___').length !== 2 || it.full.includes('___') || !it.answers.length || !it.en || !it.note || !it.label; });
+    check(iBad.length === 0, window.FR_FORMS.items.length + ' hand-written items are complete' + (iBad.length ? ': ' + iBad.map(x => x[1]).join('; ') : ''));
+    const J = A.forms.judge, itJ = A.forms.fromItem(['adj', 'Elle est ___.', 'préférée', 'préféré', 'x', 'y']);
+    check(J(itJ, 'préférée') === 'ok' && J(itJ, 'preferee') === 'accent' && J(itJ, 'préférer') === 'sound' && J(itJ, 'chat') === 'ko' && J(itJ, '') === 'ko', 'judge: ok, accent, sound, wrong');
+    const itV = { answers: ['suis allée', 'suis allé'] }; check(J(itV, 'suis  allé') === 'ok' && J(itV, 'suis aller') === 'sound' && J({ answers: ['lève-toi'] }, 'lève toi') === 'ok' && J({ answers: ["n'ai pas eu"] }, 'n’ai pas eu') === 'ok', 'judge: spacing, hyphens and curly apostrophes');
+
 
     log('— my texts —');
     const PG = A.paragraphs('Bonjour !\r\n\nÇa va ?   Oui.\n\n\n« Salut »');
@@ -209,7 +246,8 @@
       const b = S().dictee['reading:a1-1']; if (!b || b.spell !== 1 || b.hear !== 1 || b.score !== b.total - 2) throw new Error('saved ' + JSON.stringify(b)); if (!/%/.test($('.done b').textContent)) throw new Error('no summary'); if ($$('#sents .sent').length !== sents.length) throw new Error('sentence list'); if (!S().stats.dict || S().stats.dict.words < b.total) throw new Error('stats');
     });
     tryView('numbers: ten generated items accept their answers, score saved', () => { A.go('numbers'); for (let i = 0; i < 10; i++) { const it = A.numbers.state().items[i]; $('#num').value = A.numbers.answerFor(it); $('#check').click(); if (!$('.result.ok')) throw new Error(it.kind + ' « ' + it.say + ' » rejected ' + A.numbers.answerFor(it)); $('#next').click(); } if (!/10\/10/.test($('.done b').textContent)) throw new Error($('.done').textContent); if (S().stats.numbers.ok < 10) throw new Error('stats'); });
-    tryView('listening hub lists every dictée and the numbers drill', () => { A.go('listen'); if (!$('[data-go="numbers"]')) throw new Error('no numbers button'); if ($$('[data-go^="dictee|"]').length !== 40 + Object.keys(S().texts).length) throw new Error('dictée rows ' + $$('[data-go^="dictee|"]').length); });
+    tryView('forms: write mode accepts the shown form, hear mode speaks the whole sentence', () => { A.go('forms'); if ($$('[data-topic]').length < 19) throw new Error('topics ' + $$('[data-topic]').length); A.go('formdrill', { topic: 'all', mode: 'write' }); for (let i = 0; i < 10; i++) { const it = A.forms.state().items[i]; if (!$('.blank.cue')) throw new Error('no cue shown'); $('#ans').value = it.show; $('#check').click(); if (!$('.result.ok')) throw new Error(it.blank + ' rejected ' + it.show); $('#next').click(); } if (!/10\/10/.test($('.done b').textContent)) throw new Error($('.done').textContent); if (!S().stats.forms || Object.values(S().stats.forms).reduce((a, x) => a + x.ok, 0) < 10) throw new Error('stats'); A.go('formdrill', { topic: 'pc', mode: 'hear' }); const it = A.forms.state().items[0]; if (spoken[spoken.length - 1] !== it.full) throw new Error('not spoken: ' + spoken[spoken.length - 1]); if ($('.blank.cue')) throw new Error('cue shown in hear mode'); $('#ans').value = 'zzz'; $('#check').click(); if (!$('.result.ko')) throw new Error('wrong answer accepted'); });
+    tryView('listening hub lists every dictée and the numbers drill', () => { A.go('listen'); if (!$('[data-go="numbers"]')) throw new Error('no numbers button'); if (!$('[data-go="forms"]')) throw new Error('no forms button'); if ($$('[data-go^="dictee|"]').length !== 40 + Object.keys(S().texts).length) throw new Error('dictée rows ' + $$('[data-go^="dictee|"]').length); });
     tryView('mine: add by form, open, English toggle, dictée, hub, edit, delete', () => {
       A.go('mine'); $('#newText').value = 'Bonjour tout le monde.\n\nÀ demain !'; $('#newSrc').value = 'a note'; $('#addText').click();
       if ($$('.para').length !== 2 || !/Bonjour tout le monde\./.test($('#app h1').textContent) || !$('#explain') || !$('#copyPrompt')) throw new Error('form add did not open the text'); $('#pasteAnswer').value = 'Voici : {"title":"Salut","level":"A1","en":["Hello everyone.","See you tomorrow!"],"notes":"Two greetings.","vocab":[["tout le monde","phrase","everyone","Bonjour tout le monde"]],"patterns":[],"idioms":[],"grammar":[]}'; $('#useAnswer').click(); if (!/Salut/.test($('#app h1').textContent) || $$('details.sec#vocab').length !== 1 || $('#explain')) throw new Error('pasted answer not applied'); const added = Object.values(S().texts).find(x => x.src === 'a note'); if (!added) throw new Error('not stored');
