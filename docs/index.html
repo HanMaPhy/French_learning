@@ -1,290 +1,116 @@
-<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
-<title>Allons-y</title>
-<meta name="claude:viewport-fit-sides" content="cover">
-<!-- charset + viewport are for opening this file directly; the Artifact publisher adds its own, which these duplicate harmlessly -->
+<!doctype html>
+<!-- The lock page of the public build. build.py puts it at docs/index.html with 22 filled in; the app itself is not in this file but
+     sealed in allons-y.enc, which this page fetches and decrypts with the password (see tools/gate.py for the scheme). To change the wording
+     or the address, edit the <main> below and build again; the address is assembled by the script so that it is not harvested as plain text. -->
+<html lang="en">
+<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Allons-y</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap">
-<style>
-/* Layout: one centred column like a textbook page; a sticky header carries the four sections.
-   French text is always set in the serif so the eye learns to separate it from the English gloss. */
-:root{
-  --bg:#f3f4f7; --surface:#ffffff; --surface-2:#e9ecf2; --line:#d6dae3;
-  --fg:#1a1e2a; --muted:#5f6779; --faint:#9aa2b3;
-  --accent:#2a4a9b; --accent-fg:#ffffff; --accent-soft:#e3e9f8;
-  --fr:#8a2b35; --good:#2f7d4f; --good-soft:#dff2e6; --warn:#a56a12; --warn-soft:#fbeed4; --bad:#b63a3a; --bad-soft:#f9e1e1;
-  --font-ui:"Source Sans 3","Segoe UI",system-ui,-apple-system,sans-serif;
-  --font-fr:"Newsreader","Iowan Old Style","Times New Roman",Georgia,serif;
-  --radius:10px; --shadow:0 1px 2px rgba(20,24,40,.06),0 6px 20px rgba(20,24,40,.06);
-}
-@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
-  --bg:#13161d; --surface:#1b1f28; --surface-2:#242935; --line:#323846;
-  --fg:#e7e9ef; --muted:#a3abbb; --faint:#6c7485;
-  --accent:#8aa6ef; --accent-fg:#0f1524; --accent-soft:#232c45;
-  --fr:#e39aa2; --good:#6fc48f; --good-soft:#1d3327; --warn:#e0b05a; --warn-soft:#3a2f17; --bad:#ef8585; --bad-soft:#3d2222;
-  --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 20px rgba(0,0,0,.35); color-scheme:dark } }
-:root[data-theme="dark"]{
-  --bg:#13161d; --surface:#1b1f28; --surface-2:#242935; --line:#323846;
-  --fg:#e7e9ef; --muted:#a3abbb; --faint:#6c7485;
-  --accent:#8aa6ef; --accent-fg:#0f1524; --accent-soft:#232c45;
-  --fr:#e39aa2; --good:#6fc48f; --good-soft:#1d3327; --warn:#e0b05a; --warn-soft:#3a2f17; --bad:#ef8585; --bad-soft:#3d2222;
-  --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 20px rgba(0,0,0,.35); color-scheme:dark }
-
-*{box-sizing:border-box}
-html,body{height:100%}
-body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-ui);font-size:17px;line-height:1.5;-webkit-font-smoothing:antialiased}
-body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
-button{font:inherit;color:inherit;cursor:pointer}
-button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-h1,h2,h3{margin:0;text-wrap:balance;line-height:1.2}
-p{margin:0}
-.fr{font-family:var(--font-fr);font-size:1.18em;color:var(--fg)}
-.en{color:var(--muted)}
-.eyebrow{font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
-.num{font-variant-numeric:tabular-nums}
-
-/* header */
-.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:9;background:var(--surface);border-bottom:1px solid var(--line)}
-.top-in{max-width:780px;margin:0 auto;display:flex;align-items:center;gap:14px;padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-.brand{font-family:var(--font-fr);font-weight:600;font-size:1.35rem;letter-spacing:-.01em;display:flex;align-items:baseline;gap:8px}
-.brand small{font-family:var(--font-ui);font-weight:500;font-size:.8rem;color:var(--muted);letter-spacing:.04em}
-.nav{display:flex;gap:4px;margin-left:auto}
-.nav button{border:0;background:transparent;padding:7px 11px;border-radius:999px;color:var(--muted);font-weight:600;font-size:.95rem}
-.nav button[aria-current="page"]{background:var(--accent-soft);color:var(--accent)}
-.icon-btn{border:1px solid var(--line);background:var(--surface);border-radius:999px;width:36px;height:36px;display:inline-flex;align-items:center;justify-content:center;color:var(--muted);flex:none}
-.icon-btn:hover{color:var(--accent);border-color:var(--accent)}
-.icon-btn svg{width:18px;height:18px}
-
-/* page */
-.page{max-width:780px;margin:0 auto;padding-block:22px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-.page>*+*{margin-top:18px}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px}
-.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.grow{flex:1 1 auto;min-width:0}
-.stack{display:flex;flex-direction:column;gap:10px}
-.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 14px;font-weight:600;font-size:.95rem;display:inline-flex;align-items:center;gap:7px}
-.btn:hover{border-color:var(--accent);color:var(--accent)}
-.btn.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
-.btn.primary:hover{filter:brightness(1.08);color:var(--accent-fg)}
-.btn.ghost{border-color:transparent;background:transparent;color:var(--muted)}
-.btn:disabled{opacity:.5;cursor:default}
-.btn.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
-.notes-box{margin-top:8px;line-height:1.55}.notes-box p{margin:6px 0}.notes-box h3{font-size:1rem;margin:14px 0 4px}.notes-box ul{margin:4px 0;padding-left:22px}.notes-box li{margin:3px 0}.notes-box code{font-size:.92em;background:var(--surface-2);padding:1px 5px;border-radius:4px}
-.btn svg{width:16px;height:16px}
-.speak{border:0;background:var(--accent-soft);color:var(--accent);border-radius:999px;width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;flex:none;vertical-align:middle}
-.speak svg{width:16px;height:16px}
-.speak.playing{background:var(--accent);color:var(--accent-fg)}
-.pill{display:inline-block;font-size:.75rem;font-weight:700;letter-spacing:.06em;padding:2px 8px;border-radius:999px;background:var(--surface-2);color:var(--muted)}
-.pill.lvl{background:var(--accent-soft);color:var(--accent)}
-.bar{height:6px;background:var(--surface-2);border-radius:999px;overflow:hidden}
-.bar i{display:block;height:100%;background:var(--accent);border-radius:999px;transition:width .3s}
-.bar i.good{background:var(--good)}
-
-/* book / table of contents */
-.chapter{display:grid;gap:14px}
-.chapter-head{display:grid;grid-template-columns:auto 1fr;gap:4px 16px;align-items:baseline}
-.chapter-head .lvl{font-family:var(--font-fr);font-size:2.4rem;font-weight:600;color:var(--accent);line-height:1;grid-row:span 2}
-.chapter-head h2{font-size:1.25rem}
-.chapter-head p{color:var(--muted);font-size:.95rem}
-.lessons{display:grid;gap:8px}
-.lesson-row{display:grid;grid-template-columns:34px 1fr auto;gap:12px;align-items:center;width:100%;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:var(--radius);padding:12px 14px}
-.lesson-row:hover{border-color:var(--accent)}
-.lesson-row .n{font-family:var(--font-fr);font-size:1.3rem;color:var(--muted);text-align:center}
-.lesson-row .t{font-weight:600}
-.lesson-row .sub{font-size:.85rem;color:var(--muted)}
-.dots{display:flex;gap:3px;flex-wrap:wrap;max-width:120px;justify-content:flex-end}
-.dots i{width:9px;height:9px;border-radius:2px;background:var(--surface-2);border:1px solid var(--line)}
-.dots i.b1{background:var(--warn-soft);border-color:var(--warn)}
-.dots i.b3{background:var(--good-soft);border-color:var(--good)}
-.dots i.b5{background:var(--good);border-color:var(--good)}
-.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
-.stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px}
-.stat b{display:block;font-size:1.6rem;font-family:var(--font-fr);font-weight:600;line-height:1.1}
-.stat span{font-size:.85rem;color:var(--muted)}
-
-/* lesson */
-.lesson-head{display:flex;flex-direction:column;gap:6px}
-.lesson-head h1{font-size:1.7rem}
-.modes{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
-.mode{border:1px solid var(--line);background:var(--surface);border-radius:var(--radius);padding:12px 14px;text-align:left;display:flex;flex-direction:column;gap:2px}
-.mode:hover{border-color:var(--accent)}
-.mode b{font-weight:700}
-.mode span{font-size:.85rem;color:var(--muted)}
-.word{border-top:1px solid var(--line);padding:16px 0}
-.word:first-child{border-top:0;padding-top:4px}
-.word-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
-.word-head .fr{font-size:1.45rem;font-weight:500}
-.word-head .pos{font-size:.8rem;color:var(--fr);font-style:italic;font-family:var(--font-fr)}
-.word-head .meaning{color:var(--muted);font-size:1rem}
-.word-head .state{margin-left:auto}
-.ex{display:grid;grid-template-columns:32px 1fr;gap:6px 10px;align-items:start;margin-top:10px}
-.ex .fr{font-size:1.08rem}
-.ex .en{font-size:.92rem}
-.ex .en[hidden]{display:none}
-
-/* drills */
-.drill-head{display:flex;align-items:center;gap:12px}
-.drill-head .bar{flex:1}
-.prompt{font-family:var(--font-fr);font-size:1.6rem;line-height:1.35;text-wrap:balance}
-.prompt .blank{display:inline-block;min-width:4.5ch;border-bottom:2px solid var(--accent);color:var(--accent);text-align:center;font-weight:500;padding:0 .2em}
-.prompt .blank.ok{color:var(--good);border-color:var(--good)}
-.prompt .blank.ko{color:var(--bad);border-color:var(--bad)}
-.prompt .blank.sp{color:var(--warn);border-color:var(--warn)}
-.prompt .blank.cue{color:var(--muted);font-family:var(--font-ui);font-size:.72em;font-weight:600;font-style:italic;letter-spacing:.01em;vertical-align:baseline}
-.hint{color:var(--muted);margin-top:8px}
-.choices{display:grid;gap:8px;margin-top:16px}
-.choice{text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:11px 14px;font-size:1.02rem}
-.choice:hover{border-color:var(--accent)}
-.choice.fr{font-family:var(--font-fr);font-size:1.1rem}
-.choice.ok{background:var(--good-soft);border-color:var(--good)}
-.choice.ko{background:var(--bad-soft);border-color:var(--bad)}
-.choice:disabled{cursor:default}
-.flash{min-height:240px;display:flex;flex-direction:column;justify-content:center;gap:12px;text-align:center}
-.flash .fr{font-size:2rem;font-weight:500}
-.flash .back{border-top:1px dashed var(--line);padding-top:14px;display:flex;flex-direction:column;gap:8px}
-.flash .back .fr{font-size:1.2rem;font-weight:400}
-.rate{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
-.rate button{border-radius:8px;padding:12px;font-weight:700;border:1px solid var(--line);background:var(--surface)}
-.rate .again{color:var(--bad);border-color:var(--bad)}
-.rate .hard{color:var(--warn);border-color:var(--warn)}
-.rate .good{color:var(--good);border-color:var(--good)}
-.rate small{display:block;font-weight:500;color:var(--muted);font-size:.78rem}
-textarea.dict{width:100%;min-height:90px;resize:vertical;font:inherit;font-family:var(--font-fr);font-size:1.15rem;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg)}
-.diff{font-family:var(--font-fr);font-size:1.25rem;line-height:1.7;margin-top:10px}
-.diff .ok{color:var(--good)}
-.diff .miss{color:var(--bad);text-decoration:underline;text-decoration-style:wavy}
-.diff .extra{color:var(--faint);text-decoration:line-through}
-.chips{display:flex;flex-wrap:wrap;gap:8px;min-height:48px;padding:10px;border:1px dashed var(--line);border-radius:8px}
-.chips.built{border-style:solid;background:var(--surface-2)}
-.chip{font-family:var(--font-fr);font-size:1.1rem;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:6px 11px;white-space:nowrap}
-.chip:hover{border-color:var(--accent)}
-.result{margin-top:12px;padding:12px 14px;border-radius:8px;font-weight:600}
-.result.ok{background:var(--good-soft);color:var(--good)}
-.result.ko{background:var(--bad-soft);color:var(--bad)}
-.result .fr{font-weight:400;display:block;color:var(--fg)}
-.result .en{font-weight:400;display:block;font-size:.95rem}
-.done{text-align:center;display:flex;flex-direction:column;gap:12px;align-items:center;padding:20px 0}
-.done b{font-family:var(--font-fr);font-size:3rem;font-weight:600;line-height:1}
-.actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:16px}
-
-/* listening */
-.passage-row,.drow{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;width:100%;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:var(--radius);padding:12px 14px}
-.passage-row:hover,.drow:hover{border-color:var(--accent)}
-.player{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.player input[type=range]{flex:1 1 140px;min-width:120px;accent-color:var(--accent)}
-.sent{display:grid;grid-template-columns:32px 1fr;gap:6px 10px;align-items:start;padding:8px 0;border-top:1px solid var(--line)}
-.sent:first-child{border-top:0}
-.sent.active .fr{color:var(--accent)}
-.sent .fr{font-size:1.12rem}
-.sent .en{font-size:.92rem}
-.q{border-top:1px solid var(--line);padding:14px 0}
-.q .qt{font-weight:600;margin-bottom:8px}
-.q .choices{margin-top:0}
-
-/* reading */
-.read-card{display:grid;gap:4px;width:100%;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:var(--radius);padding:14px 16px}
-.read-card:hover{border-color:var(--accent)}
-.read-card .t{font-size:1.3rem;font-weight:500}
-.read-card .sub{font-size:.88rem}
-.reading{margin-top:12px}
-.para{display:grid;grid-template-columns:32px 1fr;gap:6px 10px;align-items:start;padding:10px 0;border-top:1px solid var(--line)}
-.para:first-child{border-top:0}
-.para .fr{font-size:1.18rem;line-height:1.65}
-.para .en{font-size:.95rem;margin-top:6px}
-.para.active .fr{color:var(--accent)}
-.notes{margin-top:8px;line-height:1.6}
-details.sec summary{cursor:pointer;display:flex;align-items:center;gap:10px;list-style:none}
-details.sec summary::-webkit-details-marker{display:none}
-details.sec summary::after{content:"+";margin-left:auto;color:var(--muted);font-weight:700;font-size:1.1rem}
-details.sec[open] summary::after{content:"–"}
-details.sec .gloss,details.sec .note{margin-top:12px}
-.note{border-top:1px solid var(--line);padding-top:12px}
-.note h3{font-size:1.05rem;margin-bottom:4px}
-.note .pattern{font-size:1.15rem;font-weight:500}
-.note .en{margin-top:4px;line-height:1.55}
-.note .lit{font-style:italic;font-size:.9rem;color:var(--faint)}
-.ex-line{display:flex;align-items:center;gap:8px;margin-top:8px}
-.ex-line .fr{font-size:1.08rem}
-.gloss{display:grid;gap:10px}
-.g{border-top:1px solid var(--line);padding-top:10px}
-.g-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
-.g-head .fr{font-size:1.2rem;font-weight:500}
-.g-head .pos{font-size:.8rem;color:var(--fr);font-style:italic;font-family:var(--font-fr)}
-.g-head .meaning{color:var(--muted)}
-.g-ctx{font-size:1rem;color:var(--muted);margin-top:2px}
-
-.result .diff{display:block}
-.diff .sp{color:var(--warn);text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px}
-.legend.diff{font-family:var(--font-ui);font-size:.85rem;color:var(--muted);margin-top:8px;line-height:1.5}
-input.dict{width:100%;font:inherit;font-size:1.25rem;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg);margin-top:10px}
-
-/* settings dialog */
-.overlay{position:fixed;inset:0;background:rgba(10,12,20,.45);display:flex;align-items:flex-end;justify-content:center;z-index:20;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-@media (min-width:600px){.overlay{align-items:center}}
-.dialog{background:var(--surface);border-radius:14px 14px 0 0;width:100%;max-width:520px;padding:20px;padding-bottom:calc(20px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow);margin-bottom:0;min-width:0;max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
-.field select{width:100%;min-width:0;text-overflow:ellipsis} /* a long voice name must not widen the dialog past the phone */
-@media (min-width:600px){.dialog{border-radius:14px}}
-.field{display:flex;flex-direction:column;gap:6px}
-.field label{font-weight:600;font-size:.9rem}
-select,input[type=text]{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg);max-width:100%}
-.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:9px 16px;border-radius:999px;font-weight:600;font-size:.9rem;z-index:30;box-shadow:var(--shadow);max-width:calc(100% - 32px)}
-.notice{background:var(--warn-soft);color:var(--warn);border-radius:8px;padding:10px 14px;font-size:.95rem}
-@media (max-width:480px){
-  .nav button{padding:7px 7px;font-size:.86rem}
-  .top-in{gap:8px}
-  .brand small{display:none}
-  .lesson-row{grid-template-columns:28px 1fr}
-  .lesson-row .dots{grid-column:2;justify-content:flex-start;max-width:none}
-  .prompt{font-size:1.35rem}
-  .flash .fr{font-size:1.6rem}
-}
-@media (prefers-reduced-motion: reduce){ *{transition:none !important} }
+<style>/* the reset the Artifact viewer adds, so the unlocked page renders as it does there */
+:root{color-scheme:light;box-sizing:border-box}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
+<style id="lockStyle">
+:root{--bg:#f3f4f7;--surface:#fff;--line:#d6dae3;--fg:#1a1e2a;--muted:#5f6779;--accent:#2a4a9b;--accent-fg:#fff;--accent-soft:#e3e9f8;--bad:#b63a3a;--shadow:0 1px 2px rgba(20,24,40,.06),0 6px 20px rgba(20,24,40,.06)}
+@media (prefers-color-scheme:dark){:root{--bg:#13161d;--surface:#1b1f28;--line:#323846;--fg:#e7e9ef;--muted:#a3abbb;--accent:#8aa6ef;--accent-fg:#0f1524;--accent-soft:#232c45;--bad:#ef8585;--shadow:0 1px 2px rgba(0,0,0,.4),0 6px 20px rgba(0,0,0,.35);color-scheme:dark}}
+body{background:var(--bg);color:var(--fg);font-family:"Source Sans 3","Segoe UI",system-ui,-apple-system,sans-serif;font-size:17px;line-height:1.5;-webkit-font-smoothing:antialiased;min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px))}
+.gate{width:100%;max-width:440px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:26px 24px 20px;box-shadow:var(--shadow)}
+.gate h1{font-family:"Newsreader","Iowan Old Style","Times New Roman",Georgia,serif;font-weight:600;font-size:2.1rem;letter-spacing:-.01em;margin:0;line-height:1.1}
+.gate .eyebrow{font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;margin:6px 0 18px}
+.gate p{margin:0 0 12px;color:var(--muted);font-size:.97rem}
+.gate p b{color:var(--fg);font-weight:600}
+.gate a{color:var(--accent);font-weight:600}
+.gate form{margin-top:20px;display:flex;flex-direction:column;gap:12px}
+.gate label{font-weight:600;font-size:.9rem;display:flex;flex-direction:column;gap:5px}
+.gate input[type=password]{font:inherit;font-size:1.05rem;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 12px;width:100%}
+.gate input:focus-visible,.gate button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.gate .chk{flex-direction:row;align-items:center;gap:8px;font-weight:500;color:var(--muted);font-size:.95rem}
+.gate .chk input{accent-color:var(--accent);width:17px;height:17px;margin:0}
+.gate button{font:inherit;font-weight:600;background:var(--accent);color:var(--accent-fg);border:1px solid var(--accent);border-radius:8px;padding:9px 18px;cursor:pointer;align-self:flex-start}
+.gate button:disabled{opacity:.6;cursor:default}
+.gate .err{color:var(--bad);font-size:.92rem;min-height:1.4em;margin:0}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+#wait{color:var(--muted)}
 </style>
-
-<header class="top">
-  <div class="top-in">
-    <div class="brand">Allons-y <small>FRANÇAIS A1–C1</small></div>
-    <nav class="nav" id="nav" aria-label="Sections">
-      <button data-view="book">Book</button>
-      <button data-view="review">Review</button>
-      <button data-view="listen">Listening</button>
-      <button data-view="forms">Forms</button>
-      <button data-view="mine">Mine</button>
-    </nav>
-    <button class="icon-btn" id="settingsBtn" aria-label="Settings" title="Settings">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
-    </button>
-  </div>
-</header>
-
-<main class="page" id="app">
-  <div class="card"><p class="en">Loading the book…</p></div>
+</head>
+<body>
+<p id="wait" hidden>Opening…</p>
+<main class="gate" id="gate" hidden>
+  <h1>Allons-y</h1>
+  <div class="eyebrow">Français A1–C1 · private</div>
+  <p>This is one person's French study app, not a public site. It opens with a password that only its owner has.</p>
+  <p>If you would like to use it, ask first: write to <a id="mail" data-u="chqmlzmh" data-h="gmail.com" href="#">the owner</a> and say who you are. Access is by that consent only.</p>
+  <form id="gateForm">
+    <input class="vh" type="text" name="username" value="allons-y" autocomplete="username" readonly tabindex="-1" aria-hidden="true">
+    <label for="pw">Password</label>
+    <input type="password" id="pw" name="password" autocomplete="current-password" required>
+    <label class="chk"><input type="checkbox" id="remember" checked> Remember on this device</label>
+    <button type="submit" id="go">Open</button>
+    <p class="err" id="err" role="alert"></p>
+  </form>
 </main>
-
-<script src="data/vocab-a1.js?v=21"></script>
-<script src="data/vocab-a1b.js?v=21"></script>
-<script src="data/vocab-a2.js?v=21"></script>
-<script src="data/vocab-a2b.js?v=21"></script>
-<script src="data/vocab-b1.js?v=21"></script>
-<script src="data/vocab-b1b.js?v=21"></script>
-<script src="data/vocab-b2.js?v=21"></script>
-<script src="data/vocab-b2b.js?v=21"></script>
-<script src="data/vocab-c1.js?v=21"></script>
-<script src="data/vocab-c1b.js?v=21"></script>
-<script src="data/listening.js?v=21"></script>
-<script src="data/reading-a1.js?v=21"></script>
-<script src="data/reading-a2.js?v=21"></script>
-<script src="data/reading-b1.js?v=21"></script>
-<script src="data/reading-b2.js?v=21"></script>
-<script src="data/reading-c1.js?v=21"></script>
-<script src="data/forms.js?v=21"></script>
-<script src="app-core.js?v=21"></script>
-<script src="app-listen.js?v=21"></script>
-<script src="app-drills.js?v=21"></script>
-<script src="app-reading.js?v=21"></script>
-<script src="app-audio.js?v=21"></script>
-<script src="app-mine.js?v=21"></script>
-<script src="app-forms.js?v=21"></script>
-
-</body></html>
+<script>
+(() => {
+  'use strict';
+  const BUILD = 22, FILE = 'allons-y.enc?v=' + BUILD, ITERS = 300000, STORE = 'allonsy.gate', MAGIC = [65, 76, 89, 49]; // "ALY1"
+  const $ = id => document.getElementById(id), enc = new TextEncoder();
+  const hex = b => Array.from(b, x => x.toString(16).padStart(2, '0')).join('');
+  const unhex = s => new Uint8Array(s.match(/../g).map(h => parseInt(h, 16)));
+  // a sealed file: magic ‖ salt ‖ iv ‖ tag ‖ ciphertext; the tag covers everything but itself
+  const parse = buf => {
+    const b = new Uint8Array(buf);
+    if (b.length < 68 || MAGIC.some((c, i) => b[i] !== c)) throw new Error('That is not an Allons-y file.');
+    const signed = new Uint8Array(b.length - 32); signed.set(b.subarray(0, 36)); signed.set(b.subarray(68), 36);
+    return { salt: b.slice(4, 20), iv: b.slice(20, 36), tag: b.slice(36, 68), ct: b.slice(68), signed };
+  };
+  let sealed; // the app, fetched once
+  const load = async () => { if (!sealed) { const r = await fetch(FILE); if (!r.ok) throw new Error('The app file is missing (' + r.status + ').'); sealed = parse(await r.arrayBuffer()); } return sealed; };
+  const derive = async (pw, salt) => new Uint8Array(await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: ITERS, hash: 'SHA-256' },
+    await crypto.subtle.importKey('raw', enc.encode(pw), 'PBKDF2', false, ['deriveBits']), 512));
+  // checks the tag, decrypts and inflates; null when the keys do not fit
+  const open = async (keys, f) => {
+    const mk = await crypto.subtle.importKey('raw', keys.slice(32), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
+    if (!await crypto.subtle.verify('HMAC', mk, f.tag, f.signed)) return null;
+    const ek = await crypto.subtle.importKey('raw', keys.slice(0, 32), 'AES-CTR', false, ['decrypt']);
+    const z = await crypto.subtle.decrypt({ name: 'AES-CTR', counter: f.iv, length: 128 }, ek, f.ct);
+    return JSON.parse(await new Response(new Blob([z]).stream().pipeThrough(new DecompressionStream('deflate'))).text());
+  };
+  // puts the page in and runs its scripts in order, as the plain build would have loaded them
+  const boot = (keys, p) => {
+    window.GATE = { build: BUILD, open: async buf => open(keys, parse(buf)), lock() { try { localStorage.removeItem(STORE); } catch (e) {} location.reload(); } };
+    $('lockStyle').remove(); document.documentElement.lang = 'fr';
+    document.body.innerHTML = p.html;
+    p.scripts.forEach(s => { const el = document.createElement('script'); el.textContent = s.code + '\n//# sourceURL=' + s.name; document.body.appendChild(el); });
+  };
+  const show = msg => { $('wait').hidden = true; $('gate').hidden = false; $('err').textContent = msg || ''; $('pw').focus(); };
+  async function unlock(pw, keep) {
+    const f = await load(), keys = await derive(pw, f.salt), p = await open(keys, f);
+    if (!p) return false;
+    if (keep) try { localStorage.setItem(STORE, JSON.stringify({ salt: hex(f.salt), keys: hex(keys) })); } catch (e) {}
+    boot(keys, p); return true;
+  }
+  async function auto() {  // a remembered device opens straight away; a changed password (new salt) asks again
+    let s = null; try { s = JSON.parse(localStorage.getItem(STORE)); } catch (e) {}
+    if (!s || !s.keys) return show();
+    $('wait').hidden = false;
+    const f = await load();
+    if (s.salt !== hex(f.salt)) { try { localStorage.removeItem(STORE); } catch (e) {} return show('The password was changed. Enter the new one.'); }
+    const p = await open(unhex(s.keys), f);
+    if (!p) return show('The app file did not check out. Try again in a minute.');
+    boot(unhex(s.keys), p);
+  }
+  $('gateForm').addEventListener('submit', async e => {
+    e.preventDefault(); const b = $('go'); b.disabled = true; b.textContent = 'Opening…'; $('err').textContent = '';
+    try { if (!await unlock($('pw').value, $('remember').checked)) { $('err').textContent = 'That is not the password.'; $('pw').select(); } }
+    catch (err) { $('err').textContent = err.message || String(err); }
+    b.disabled = false; b.textContent = 'Open';
+  });
+  const a = $('mail'), m = a.dataset.u + '@' + a.dataset.h; a.textContent = m; a.href = 'mailto:' + m + '?subject=Allons-y';
+  window.Gate = { unlock }; // for the build's self-test
+  if (!window.crypto || !crypto.subtle || typeof DecompressionStream !== 'function') show('This browser is too old to open the app: it needs Safari 16.4, Chrome 80, Firefox 113 or newer.');
+  else auto().catch(err => show(err.message || String(err)));
+})();
+</script>
+</body>
+</html>

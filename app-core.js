@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1'];
-  const BUILD = 21; // bump together with the ?v= on the script tags in index.html whenever the scripts change
+  const BUILD = 22; // bump together with the ?v= on the script tags in index.html whenever the scripts change
 
   // ---------- merge data files into one book ----------
   const BOOK = [];
@@ -89,6 +89,10 @@
     remove(id) { delete S.texts[id]; saveLocal(); if (dbTexts) dbChain = dbChain.then(() => dbTexts.doc(id).delete()).catch(() => { sync.status = 'error'; }); }
   };
   // ---------- backup files: everything in one JSON, so progress and texts never depend on any one browser, account or host ----------
+  // the progress-only backup published next to the site (tools/publish-backup.py): sealed with the site's password where there is a gate
+  const siteBackup = () => window.GATE
+    ? fetch('backup.enc', { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error('none'); return r.arrayBuffer(); }).then(b => window.GATE.open(b)).then(o => { if (!o) throw new Error('bad'); return o; })
+    : fetch('backup.json', { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error('none'); return r.json(); });
   function exportData() { return { app: 'allons-y', build: BUILD, exported: Date.now(), state: JSON.parse(JSON.stringify(S)) }; }
   function importData(o, replace) { // a full backup is merged into this device's progress (or replaces it when asked); a file holding only texts adds them to Mine
     if (!o || typeof o !== 'object') throw new Error('not a backup');
@@ -446,7 +450,7 @@
         <span class="en" style="font-size:.88rem">Speed is a request to the voice, not a command: Apple's Premium and Enhanced voices in particular barely change pace with it. The Slower button in Dictation and Listen &amp; pick, and Slow on a passage, do not depend on it: they read in breath groups with a pause between them, at a reduced speed, so they are slower with every voice.</span></div>
       <div class="row"><button class="btn" id="testVoice">Test voice</button><label class="row" style="gap:6px"><input type="checkbox" id="showEnSel" ${S.settings.showEn ? 'checked' : ''}> Show English in lessons</label></div>
       <div class="field"><label for="fromSel">Start from level</label><select id="fromSel">${LEVELS.map(L => `<option value="${L}" ${(S.settings.minLevel || 'A1') === L ? 'selected' : ''}>${L}${L === 'A1' ? ' (show everything)' : ''}</option>`).join('')}</select><span class="en" style="font-size:.88rem">Levels below this are hidden from the Book, Listening and Review, and their words never come up for review.</span></div>
-      <p class="en" style="font-size:.9rem">${syncText} <span class="num" style="color:var(--faint)">· build ${BUILD}</span> <button class="btn ghost" id="updBtn" style="padding:2px 8px;font-size:.85rem">Check for updates</button></p>
+      <p class="en" style="font-size:.9rem">${syncText} <span class="num" style="color:var(--faint)">· build ${BUILD}</span> <button class="btn ghost" id="updBtn" style="padding:2px 8px;font-size:.85rem">Check for updates</button>${window.GATE ? '<button class="btn ghost" id="lockBtn" style="padding:2px 8px;font-size:.85rem" title="Forget the password on this device and show the lock page">Lock this device</button>' : ''}</p>
       <div class="field"><label>Backup</label><div class="row"><button class="btn" id="exportBtn">Export everything</button><button class="btn" id="importBtn">Import a file</button><button class="btn" id="siteBtn" title="Merges the progress file published next to this site (tools/publish-backup.py), if there is one">Import from the site</button><button class="btn ghost" id="replaceBtn">Replace with a file</button><input type="file" id="importFile" accept=".json,application/json" hidden></div>
         <span class="en" style="font-size:.88rem">Export writes one JSON file with your progress, settings and your own texts: keep it anywhere. Import merges such a backup into this device: for each word the more recently reviewed copy wins, best scores are kept, texts by their last edit, so a backup can go back and forth between the phone and the computer. Replace throws away what is here first. A file holding only texts adds them to Mine. Import from the site pulls the progress-only backup published next to the app, if one is there: on the computer, run tools/publish-backup.py on an export and push.</span></div>
       <div class="row" style="justify-content:space-between"><button class="btn ghost" id="resetBtn" style="color:var(--bad)">Reset all progress</button></div>
@@ -464,6 +468,7 @@
     ov.querySelector('#fromSel').addEventListener('change', e => { S.settings.minLevel = e.target.value; save(); });
     ov.querySelector('#testVoice').addEventListener('click', () => TTS.speak('Bonjour ! Allons-y, apprenons le français ensemble.'));
     ov.querySelector('#updBtn').addEventListener('click', () => A.checkUpdate(true));
+    if (ov.querySelector('#lockBtn')) ov.querySelector('#lockBtn').addEventListener('click', () => window.GATE.lock());
     ov.querySelector('#exportBtn').addEventListener('click', () => {
       const blob = new Blob([JSON.stringify(exportData(), null, 1)], { type: 'application/json' }), a = document.createElement('a');
       a.href = URL.createObjectURL(blob); a.download = 'allons-y-' + new Date().toISOString().slice(0, 10) + '.json'; document.body.appendChild(a); a.click();
@@ -473,7 +478,7 @@
     ov.querySelector('#importBtn').addEventListener('click', () => { replace = false; ov.querySelector('#importFile').click(); });
     ov.querySelector('#replaceBtn').addEventListener('click', () => { replace = true; ov.querySelector('#importFile').click(); });
     ov.querySelector('#siteBtn').addEventListener('click', () => { const b = ov.querySelector('#siteBtn'); b.disabled = true; b.textContent = 'Fetching…';
-      fetch('backup.json', { cache: 'no-store' }).then(r => { if (!r.ok) throw new Error('none'); return r.json(); }).then(o => { const when = o && o.exported ? new Date(o.exported).toLocaleDateString() : ''; const msg = importData(o, false); close(); toast(msg + (when ? ' · published ' + when : '')); })
+      siteBackup().then(o => { const when = o && o.exported ? new Date(o.exported).toLocaleDateString() : ''; const msg = importData(o, false); close(); toast(msg + (when ? ' · published ' + when : '')); })
         .catch(() => { b.disabled = false; b.textContent = 'Import from the site'; toast('No backup is published with this site'); }); });
     ov.querySelector('#importFile').addEventListener('change', e => { const f = e.target.files[0]; if (!f) return; f.text().then(txt => { const msg = importData(JSON.parse(txt), replace); close(); toast(msg); }).catch(() => toast('That is not an Allons-y file')); });
     const rb = ov.querySelector('#resetBtn');

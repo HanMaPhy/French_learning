@@ -7,5 +7,7 @@ audio/
 .DS_Store
 Thumbs.db
 *.swp
+# the password of the public site, as a derived key (tools/gate.py); set with build.py --set-password
+gate.json
 # the private build (build.py --private): the public build is docs/
 local/

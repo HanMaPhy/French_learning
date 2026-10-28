@@ -1,0 +1,116 @@
+<!doctype html>
+<!-- The lock page of the public build. build.py puts it at docs/index.html with {{BUILD}} filled in; the app itself is not in this file but
+     sealed in allons-y.enc, which this page fetches and decrypts with the password (see tools/gate.py for the scheme). To change the wording
+     or the address, edit the <main> below and build again; the address is assembled by the script so that it is not harvested as plain text. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Allons-y</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap">
+<style>/* the reset the Artifact viewer adds, so the unlocked page renders as it does there */
+:root{color-scheme:light;box-sizing:border-box}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
+<style id="lockStyle">
+:root{--bg:#f3f4f7;--surface:#fff;--line:#d6dae3;--fg:#1a1e2a;--muted:#5f6779;--accent:#2a4a9b;--accent-fg:#fff;--accent-soft:#e3e9f8;--bad:#b63a3a;--shadow:0 1px 2px rgba(20,24,40,.06),0 6px 20px rgba(20,24,40,.06)}
+@media (prefers-color-scheme:dark){:root{--bg:#13161d;--surface:#1b1f28;--line:#323846;--fg:#e7e9ef;--muted:#a3abbb;--accent:#8aa6ef;--accent-fg:#0f1524;--accent-soft:#232c45;--bad:#ef8585;--shadow:0 1px 2px rgba(0,0,0,.4),0 6px 20px rgba(0,0,0,.35);color-scheme:dark}}
+body{background:var(--bg);color:var(--fg);font-family:"Source Sans 3","Segoe UI",system-ui,-apple-system,sans-serif;font-size:17px;line-height:1.5;-webkit-font-smoothing:antialiased;min-height:100vh;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px))}
+.gate{width:100%;max-width:440px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:26px 24px 20px;box-shadow:var(--shadow)}
+.gate h1{font-family:"Newsreader","Iowan Old Style","Times New Roman",Georgia,serif;font-weight:600;font-size:2.1rem;letter-spacing:-.01em;margin:0;line-height:1.1}
+.gate .eyebrow{font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;margin:6px 0 18px}
+.gate p{margin:0 0 12px;color:var(--muted);font-size:.97rem}
+.gate p b{color:var(--fg);font-weight:600}
+.gate a{color:var(--accent);font-weight:600}
+.gate form{margin-top:20px;display:flex;flex-direction:column;gap:12px}
+.gate label{font-weight:600;font-size:.9rem;display:flex;flex-direction:column;gap:5px}
+.gate input[type=password]{font:inherit;font-size:1.05rem;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 12px;width:100%}
+.gate input:focus-visible,.gate button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.gate .chk{flex-direction:row;align-items:center;gap:8px;font-weight:500;color:var(--muted);font-size:.95rem}
+.gate .chk input{accent-color:var(--accent);width:17px;height:17px;margin:0}
+.gate button{font:inherit;font-weight:600;background:var(--accent);color:var(--accent-fg);border:1px solid var(--accent);border-radius:8px;padding:9px 18px;cursor:pointer;align-self:flex-start}
+.gate button:disabled{opacity:.6;cursor:default}
+.gate .err{color:var(--bad);font-size:.92rem;min-height:1.4em;margin:0}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+#wait{color:var(--muted)}
+</style>
+</head>
+<body>
+<p id="wait" hidden>Opening…</p>
+<main class="gate" id="gate" hidden>
+  <h1>Allons-y</h1>
+  <div class="eyebrow">Français A1–C1 · private</div>
+  <p>This is one person's French study app, not a public site. It opens with a password that only its owner has.</p>
+  <p>If you would like to use it, ask first: write to <a id="mail" data-u="chqmlzmh" data-h="gmail.com" href="#">the owner</a> and say who you are. Access is by that consent only.</p>
+  <form id="gateForm">
+    <input class="vh" type="text" name="username" value="allons-y" autocomplete="username" readonly tabindex="-1" aria-hidden="true">
+    <label for="pw">Password</label>
+    <input type="password" id="pw" name="password" autocomplete="current-password" required>
+    <label class="chk"><input type="checkbox" id="remember" checked> Remember on this device</label>
+    <button type="submit" id="go">Open</button>
+    <p class="err" id="err" role="alert"></p>
+  </form>
+</main>
+<script>
+(() => {
+  'use strict';
+  const BUILD = {{BUILD}}, FILE = 'allons-y.enc?v=' + BUILD, ITERS = 300000, STORE = 'allonsy.gate', MAGIC = [65, 76, 89, 49]; // "ALY1"
+  const $ = id => document.getElementById(id), enc = new TextEncoder();
+  const hex = b => Array.from(b, x => x.toString(16).padStart(2, '0')).join('');
+  const unhex = s => new Uint8Array(s.match(/../g).map(h => parseInt(h, 16)));
+  // a sealed file: magic ‖ salt ‖ iv ‖ tag ‖ ciphertext; the tag covers everything but itself
+  const parse = buf => {
+    const b = new Uint8Array(buf);
+    if (b.length < 68 || MAGIC.some((c, i) => b[i] !== c)) throw new Error('That is not an Allons-y file.');
+    const signed = new Uint8Array(b.length - 32); signed.set(b.subarray(0, 36)); signed.set(b.subarray(68), 36);
+    return { salt: b.slice(4, 20), iv: b.slice(20, 36), tag: b.slice(36, 68), ct: b.slice(68), signed };
+  };
+  let sealed; // the app, fetched once
+  const load = async () => { if (!sealed) { const r = await fetch(FILE); if (!r.ok) throw new Error('The app file is missing (' + r.status + ').'); sealed = parse(await r.arrayBuffer()); } return sealed; };
+  const derive = async (pw, salt) => new Uint8Array(await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: ITERS, hash: 'SHA-256' },
+    await crypto.subtle.importKey('raw', enc.encode(pw), 'PBKDF2', false, ['deriveBits']), 512));
+  // checks the tag, decrypts and inflates; null when the keys do not fit
+  const open = async (keys, f) => {
+    const mk = await crypto.subtle.importKey('raw', keys.slice(32), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
+    if (!await crypto.subtle.verify('HMAC', mk, f.tag, f.signed)) return null;
+    const ek = await crypto.subtle.importKey('raw', keys.slice(0, 32), 'AES-CTR', false, ['decrypt']);
+    const z = await crypto.subtle.decrypt({ name: 'AES-CTR', counter: f.iv, length: 128 }, ek, f.ct);
+    return JSON.parse(await new Response(new Blob([z]).stream().pipeThrough(new DecompressionStream('deflate'))).text());
+  };
+  // puts the page in and runs its scripts in order, as the plain build would have loaded them
+  const boot = (keys, p) => {
+    window.GATE = { build: BUILD, open: async buf => open(keys, parse(buf)), lock() { try { localStorage.removeItem(STORE); } catch (e) {} location.reload(); } };
+    $('lockStyle').remove(); document.documentElement.lang = 'fr';
+    document.body.innerHTML = p.html;
+    p.scripts.forEach(s => { const el = document.createElement('script'); el.textContent = s.code + '\n//# sourceURL=' + s.name; document.body.appendChild(el); });
+  };
+  const show = msg => { $('wait').hidden = true; $('gate').hidden = false; $('err').textContent = msg || ''; $('pw').focus(); };
+  async function unlock(pw, keep) {
+    const f = await load(), keys = await derive(pw, f.salt), p = await open(keys, f);
+    if (!p) return false;
+    if (keep) try { localStorage.setItem(STORE, JSON.stringify({ salt: hex(f.salt), keys: hex(keys) })); } catch (e) {}
+    boot(keys, p); return true;
+  }
+  async function auto() {  // a remembered device opens straight away; a changed password (new salt) asks again
+    let s = null; try { s = JSON.parse(localStorage.getItem(STORE)); } catch (e) {}
+    if (!s || !s.keys) return show();
+    $('wait').hidden = false;
+    const f = await load();
+    if (s.salt !== hex(f.salt)) { try { localStorage.removeItem(STORE); } catch (e) {} return show('The password was changed. Enter the new one.'); }
+    const p = await open(unhex(s.keys), f);
+    if (!p) return show('The app file did not check out. Try again in a minute.');
+    boot(unhex(s.keys), p);
+  }
+  $('gateForm').addEventListener('submit', async e => {
+    e.preventDefault(); const b = $('go'); b.disabled = true; b.textContent = 'Opening…'; $('err').textContent = '';
+    try { if (!await unlock($('pw').value, $('remember').checked)) { $('err').textContent = 'That is not the password.'; $('pw').select(); } }
+    catch (err) { $('err').textContent = err.message || String(err); }
+    b.disabled = false; b.textContent = 'Open';
+  });
+  const a = $('mail'), m = a.dataset.u + '@' + a.dataset.h; a.textContent = m; a.href = 'mailto:' + m + '?subject=Allons-y';
+  window.Gate = { unlock }; // for the build's self-test
+  if (!window.crypto || !crypto.subtle || typeof DecompressionStream !== 'function') show('This browser is too old to open the app: it needs Safari 16.4, Chrome 80, Firefox 113 or newer.');
+  else auto().catch(err => show(err.message || String(err)));
+})();
+</script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 # Allons-y
 
-法语词汇与听力练习 app，A1 到 C1。纯静态页面：一个 `index.html`、七个 JS 文件、十七个数据文件，没有 build step，没有依赖。
+法语词汇与听力练习 app，A1 到 C1。纯静态页面：一个 `index.html`、七个 JS 文件、十七个数据文件，没有依赖；`build.py` 只是把它们打包成可发布的站点（公开版加了密码，见「发布」）。
 
 ## 运行
 
@@ -74,7 +74,7 @@ app 本身是静态文件，不依赖任何服务。同一份源码出两种 bui
 |---|---|---|
 | 命令 | `python3 build.py` | `python3 build.py --private` |
 | 内容 | 只有原创课程（词汇、阅读、短文、Numbers、Forms） | 同上，加上 `library/*.json` 预载进 Mine、`audio/` 链接到页面旁边 |
-| 放哪 | 提交进仓库，GitHub Pages（Settings → Pages → branch main, folder `/docs`）；手机电脑都能开 | 不进仓库（.gitignore），只在这台电脑：`cd local && python3 -m http.server 8000`，开 `http://localhost:8000`；同一 Wi-Fi 的手机开 `http://<电脑 IP>:8000` 也行 |
+| 放哪 | 提交进仓库，GitHub Pages（Settings → Pages → branch main, folder `/docs`）；手机电脑都能开，**要密码**（见「发布」） | 不进仓库（.gitignore），只在这台电脑：`cd local && python3 -m http.server 8000`，开 `http://localhost:8000`；同一 Wi-Fi 的手机开 `http://<电脑 IP>:8000` 也行 |
 | 录音 | 要 Choose the folder | 直接播放，不用选文件夹（`data/private-audio.js` 列出每个录音的 URL） |
 
 私有版打开时把 `data/private-texts.js` 里的语料加进 Mine，每条只加一次（`S.bundled` 记住已加过的），在 Mine 里删掉的不会回来；版权材料只存在这台电脑的 `local/` 里，永远不进仓库也不上传。
@@ -125,7 +125,24 @@ for f in *.wma; do ffmpeg -n -i "$f" -codec:a libmp3lame -q:a 4 "${f%.wma}.mp3";
 
 ## 发布
 
-线上版本是 Claude Artifact，更新时 publish `index.html`，并把改过的 JS 作为 files 一起发。**每次改了 JS，都要把 `index.html` 里全部 `<script src="…?v=N">` 的 N 和 `app-core.js` 开头的 `BUILD` 一起加一**，否则浏览器会继续用缓存里的旧脚本；Settings 底部显示当前跑的是哪个 build。
+线上版本在 GitHub Pages（仓库 public，站点从 main 的 `/docs` 发布）：
+
+```
+python3 build.py && git add -A && git commit -m "…" && git push      # 约一分钟后上线
+```
+
+**每次改了 JS，都要把 `index.html` 里全部 `<script src="…?v=N">` 的 N 和 `app-core.js` 开头的 `BUILD` 一起加一**，否则浏览器会继续用缓存里的旧脚本；Settings 底部显示当前跑的是哪个 build，站点上的 `version.json` 让已打开的页面自己发现新 build 并提示刷新。Claude Artifact 那份更新时 publish `index.html`，并把改过的 JS 作为 files 一起发。
+
+### 密码
+
+仓库是 public 的，GitHub Pages 也没有任何访问控制：静态站点没有服务器，没人能替你检查密码，而浏览器里能检查的东西访客也能跳过。所以公开版干脆**不发布任何可读的 app**：`build.py` 把页面、全部脚本和课程压缩后加密成一个文件 `docs/allons-y.enc`，`docs/index.html` 只是一个锁页（模板在 `gate.html`），输入密码后在浏览器里由密码推出密钥、解密、把 app 装进页面。没有密码，站上的文件就是噪声；进度备份 `docs/backup.enc` 同样用这把钥匙封起来。
+
+- **设密码 / 改密码**：`python3 build.py --set-password`，输两遍，然后照常 commit、push。它把推导出的密钥写进 `gate.json`（.gitignore 排除，**不要提交**），密码本身不落盘。忘了就再设一个，再发布，各设备会重新问一次；没有别的东西依赖它。
+- **自己的设备**：第一次打开输一次，勾着「Remember on this device」，以后直接进；Settings 里的 **Lock this device** 让这台设备忘掉。iPhone 上 Safari 和「添加到主屏幕」的 app 是两份存储，各输一次。
+- **别人**：锁页写明这是私人学习工具，想用先写信征得同意；地址在 `gate.html` 里的 `data-u` / `data-h` 两个属性（由脚本拼出来，不以明文出现在页面源码里），文案在同一个文件，改完重新 build。
+- **仍然公开的**：仓库本身。源码、课程数据和 git 历史任何人都能在 GitHub 上读，这是免费账户用 GitHub Pages 的代价（Pages 要求仓库 public）；密码锁住的是**站点**和**进度备份**。想连源码也藏起来，要换到能从私有仓库发布并带访问控制的托管（例如 Cloudflare Pages + Access），不是 build 的事。
+- 方案：PBKDF2-HMAC-SHA256（300 000 轮）→ AES-256-CTR 密钥 + HMAC-SHA256 密钥，encrypt-then-MAC；加密用 macOS 自带的 `openssl`，解密用浏览器的 Web Crypto（需要 Safari 16.4 / Chrome 80 / Firefox 113 以上）。细节在 `tools/gate.py` 开头。
+- `python3 build.py --open` 出一个不带密码的公开版，只用于排查问题，不要发布。
 
 ## 自测
 
