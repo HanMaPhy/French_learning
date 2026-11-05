@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1'];
-  const BUILD = 22; // bump together with the ?v= on the script tags in index.html whenever the scripts change
+  const BUILD = 23; // bump together with the ?v= on the script tags in index.html whenever the scripts change
 
   // ---------- merge data files into one book ----------
   const BOOK = [];
@@ -27,7 +27,7 @@
   const VLEVELS = () => LEVELS.filter(visible), VBOOK = () => BOOK.filter(c => visible(c.lvl)), VWORDS = () => WORDS.filter(w => visible(w.lvl)), VLISTEN = () => LISTEN.filter(p => visible(p.lvl));
 
   // ---------- progress state: localStorage always, artifact db when available ----------
-  const DEFAULT = () => ({ v: 2, words: {}, listen: {}, read: {}, dictee: {}, stats: {}, texts: {}, settings: { rate: 0.9, voice: '', showEn: true, minLevel: 'A2' }, updated: 0 });
+  const DEFAULT = () => ({ v: 2, words: {}, bank: {}, sents: [], listen: {}, read: {}, dictee: {}, stats: {}, texts: {}, settings: { rate: 0.9, voice: '', showEn: true, minLevel: 'A2' }, updated: 0 });
   const LS_KEY = 'allonsy.state';
   let S = DEFAULT();
   function adopt(o) {
@@ -110,11 +110,21 @@
   // Merging two devices' progress. The rule is idempotent and symmetric, so a backup can travel phone → computer → phone without drifting:
   // for a word, the more recently reviewed copy wins (the due date minus the box's interval says when it was last seen), ties to the higher box,
   // and the attempt count is the larger; best scores are kept; counters take the larger value; a text is taken when its last edit is newer.
-  const lastSeen = w => (w.d || 0) - INTERVALS[Math.min(5, Math.max(0, w.b || 0))] * DAY;
+  const lastSeen = (w, iv) => (w.d || 0) - (iv || INTERVALS)[Math.min((iv || INTERVALS).length - 1, Math.max(0, w.b || 0))] * DAY;
+  function mergeBoxes(dst, src, iv) { // the Book's words and the word bank (app-words.js, boxes up to 7) follow the same rule; returns how many changed
+    let n = 0; const mx = (a, b) => Math.max(a || 0, b || 0);
+    Object.entries(src || {}).forEach(([k, w]) => { const l = dst[k], a = lastSeen(w, iv), b = l ? lastSeen(l, iv) : 0; if (!l || a > b || (a === b && (w.b || 0) > (l.b || 0))) { dst[k] = { b: w.b || 0, d: w.d || 0, n: mx(w.n, l && l.n) }; n++; } else l.n = mx(l.n, w.n); });
+    return n;
+  }
   function mergeState(st) {
     const inc = JSON.parse(JSON.stringify(st)), mx = (a, b) => Math.max(a || 0, b || 0); let nw = 0, nt = 0;
     if ((inc.v || 1) < 2) inc.words = migrate(inc.words);
-    Object.entries(inc.words || {}).forEach(([k, w]) => { const l = S.words[k]; if (!l || lastSeen(w) > lastSeen(l) || (lastSeen(w) === lastSeen(l) && (w.b || 0) > (l.b || 0))) { S.words[k] = { b: w.b || 0, d: w.d || 0, n: mx(w.n, l && l.n) }; nw++; } else l.n = mx(l.n, w.n); });
+    nw += mergeBoxes(S.words, inc.words);
+    S.bank = S.bank || {}; nw += mergeBoxes(S.bank, inc.bank, BANK_INTERVALS);
+    // sentences written in the word bank: the union, one per moment and word, in time order
+    const have = new Set((S.sents = S.sents || []).map(x => x.t + '|' + x.k));
+    (Array.isArray(inc.sents) ? inc.sents : []).forEach(x => { if (x && x.k && typeof x.s === 'string' && !have.has(x.t + '|' + x.k)) { have.add(x.t + '|' + x.k); S.sents.push(x); } });
+    S.sents.sort((a, b) => (a.t || 0) - (b.t || 0));
     Object.entries(inc.listen || {}).forEach(([k, r]) => { const l = S.listen[k]; if (!l || (r.score || 0) > (l.score || 0)) S.listen[k] = r; });
     Object.entries(inc.read || {}).forEach(([k, v]) => { if (v && !S.read[k]) S.read[k] = v; });
     const q = x => (x.score || 0) / Math.max(1, x.total || 0);
@@ -164,7 +174,7 @@
   const paragraphs = text => String(text || '').replace(/\r/g, '').split('\n').map(s => s.replace(/[\u00a0\u202f]/g, ' ').replace(/[ \t]+/g, ' ').trim()).filter(Boolean);
 
   // ---------- spaced repetition (Leitner boxes 0–5) ----------
-  const INTERVALS = [0, 1, 3, 7, 14, 30], DAY = 864e5;
+  const INTERVALS = [0, 1, 3, 7, 14, 30], DAY = 864e5, BANK_INTERVALS = [0, 1, 3, 7, 14, 30, 60, 120]; // the word bank has two more boxes: two and four months
   const wstate = key => S.words[key] || { b: 0, d: 0, n: 0 };
   function rate(key, grade) { // 0 again · 1 hard · 2 good
     const w = Object.assign({ b: 0, d: 0, n: 0 }, S.words[key]); w.n++;
@@ -333,7 +343,7 @@
     const fn = views[V.name] || views.book;
     app.innerHTML = fn(V) || '';
     if (fn.after) fn.after(V);
-    const top = { lesson: 'book', reading: 'book', mytext: 'mine', dictee: 'listen', numbers: 'listen', formdrill: 'forms', drill: V.from === 'review' ? 'review' : V.from === 'listen' ? 'listen' : 'book', passage: 'listen' }[V.name] || V.name;
+    const top = { wdrill: 'words', wlist: 'words', wsents: 'words', lesson: 'book', reading: 'book', mytext: 'mine', dictee: 'listen', numbers: 'listen', formdrill: 'forms', drill: V.from === 'review' ? 'review' : V.from === 'listen' ? 'listen' : 'book', passage: 'listen' }[V.name] || V.name;
     document.querySelectorAll('#nav button').forEach(b => { if (b.dataset.view === top) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
   }
   document.getElementById('nav').addEventListener('click', e => { const b = e.target.closest('button[data-view]'); if (b) go(b.dataset.view); });
@@ -487,7 +497,7 @@
   document.getElementById('settingsBtn').addEventListener('click', openSettings);
 
   // ---------- expose for the drills file ----------
-  window.App = { LEVELS, BOOK, WORDS, LESSONS, LISTEN, READING, texts, paragraphs, exportData, importData, mergeState, addTexts, preloadTexts, textKey, visible, VLEVELS, VBOOK, VWORDS, VLISTEN, views, go, render, save, adopt, state: () => S, wstate, rate, practiceResult, dueWords, isDue, TTS, esc, fr, shuffle, pick, norm, speakBtn, toast, boxClass };
+  window.App = { LEVELS, BOOK, WORDS, LESSONS, LISTEN, READING, texts, paragraphs, exportData, importData, mergeState, addTexts, preloadTexts, textKey, visible, VLEVELS, VBOOK, VWORDS, VLISTEN, views, go, render, save, adopt, state: () => S, wstate, rate, INTERVALS, BANK_INTERVALS, DAY, practiceResult, dueWords, isDue, TTS, esc, fr, shuffle, pick, norm, speakBtn, toast, boxClass };
   if (Array.isArray(window.FR_PRIVATE_TEXTS)) preloadTexts(window.FR_PRIVATE_TEXTS); // the private build's bundled corpus
   render();
   initDb();

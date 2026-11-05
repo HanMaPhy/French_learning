@@ -1,6 +1,6 @@
 # Allons-y
 
-法语词汇与听力练习 app，A1 到 C1。纯静态页面：一个 `index.html`、七个 JS 文件、十七个数据文件，没有依赖；`build.py` 只是把它们打包成可发布的站点（公开版加了密码，见「发布」）。
+法语词汇与听力练习 app，课程 A1 到 C1，词库 A1 到 C2。纯静态页面：一个 `index.html`、八个 JS 文件、二十三个数据文件，没有依赖；`build.py` 只是把它们打包成可发布的站点（公开版加了密码，见「发布」）。
 
 ## 运行
 
@@ -19,9 +19,10 @@
 
 ## 怎么用
 
-五个 tab：
+六个 tab：
 
 - **Book**：A1–C1 五章、每章六课、每课十个词 × 三句例句。点进一课有六种练习：Flashcards（看词想义，自评）、Fill the gap（选词填空）、Rebuild（把打乱的词排回句子）、Dictation（听写）、EN → FR（看英文说法语再核对）、Listen & pick（听句选义）。课文页可以逐句朗读，也能整课连播。
+- **Words**：独立于课程的词库，A1–C2 共 6430 个词，每词一个释义一句例句。Meaning（看法语选英文意思）、Sentence（用这个词造句，对照例句自评，句子存档、可复制给助手批改）、Browse（搜索、筛选）。见下文「词库」。
 - **Reading**（每课页面顶部的卡片）：一篇按级别写的长文，逐段朗读、可切慢读、可显示英译；下面是 About this text（文体与语域讲解）、Vocabulary（正文里的生词，带原句）、Sentence patterns（可复用的句型）、Idioms & expressions、Grammar（以正文例句讲的语法点）。读完点 Mark as read，课页上会标 read ✓。
 - **Review**：到期的词在这里复习，每次用不同的例句。
 - **Start from level**（Settings）：默认从 A2 开始显示，A1 整章隐藏，不进统计也不进复习队列；改成 A1 就全部回来，改成 B1 则连 A2 也藏掉。
@@ -29,15 +30,46 @@
 - **Listening**：十篇短文，先盲听答题，再看 transcript；下面还有按级别随机抽句子的听写、重组、听选。
 - **听写判分**（所有听写）：错词分两类。目标词和你写的词做一次粗糙的 phonetic folding（`app-listen.js` 里的 `phon`），折叠后相同算「heard, misspelt」（拼写或语法：parlé / parler / parlait、on / ont、ses / ces、-ent 不发音、丢掉的重音符），不同算「missed by ear」。结果框下有图例，Listening 页顶部累计两条错误率。
 - **Dictée progressive**（Listening 页，也可从阅读页和短文页的 Dictée 按钮进）：30 篇阅读和 10 篇短文都能当课堂式听写：整篇常速听一遍 → 逐句以 breath group 慢读、你打字、立刻判分 → 整篇再听一遍并逐句标出错处。最好成绩存在 `S.dictee`。
-- **Mine**（第四个 tab）：把日常遇到的法语贴进来存着。每条文本可以逐句朗读、慢读、做 Dictée；点 Explain this text 让 Claude 按课程阅读的格式写讲解（逐段英译、生词、句型、俗语、语法），跑在你自己的 Claude 账号上，第一次会弹权限。文本存在账号下 `data/users/<id>/texts/items/<id>`，每条一个 document，本地也留一份；改正文会清掉旧讲解。
+- **Mine**（tab）：把日常遇到的法语贴进来存着。每条文本可以逐句朗读、慢读、做 Dictée；点 Explain this text 让 Claude 按课程阅读的格式写讲解（逐段英译、生词、句型、俗语、语法），跑在你自己的 Claude 账号上，第一次会弹权限。文本存在账号下 `data/users/<id>/texts/items/<id>`，每条一个 document，本地也留一份；改正文会清掉旧讲解。
 - **My notes**（Mine 每条文本的卡片）：自由文本，贴你自己或任何助手给的讲解（生词、句型、翻译、问题），和文本一起存进账号、进备份。空行分段，`-`、`•`、`1.` 开头的行成列表，`#` 或「Vocabulaire :」这类单独一行成小标题，`**粗体**` 可用，其余照原样显示。想要和课程阅读一样的结构化讲解（分段英译、Vocabulary、Sentence patterns、Idioms、Grammar 五个卡片），用 Explain 卡片里的 Copy prompt，把助手返回的 JSON 贴回 Use this answer。
 - **录音**（Mine）：一条文本可以带一个录音文件名（导入文件里的 `audio` 字段，或 Edit 里填）。打开文本时上方出现 Recording 卡片：第一次点 Choose the folder 选中 `audio/` 这个文件夹（`python3 tools/collect-audio.py` 把文本用到的 145 个录音收在这里，按书分四个子目录；文件只在本机浏览器里用，不上传；播放过的文件会缓存进 IndexedDB，下次不用再选）。播放器有 −3 s、0.7× / 0.85× / 1× 变速和 A–B 区间：按 A、B 标出一段，播放到 B 自动停并回到 A，Loop 反复。Dictée from the recording 用真人录音做听写：先整段听，再逐个 turn 写——按 Play 听，在这个 turn 结束处按 B，这一段就被隔离出来反复听，写完 Check 判分（同样分 by ear / spelling）。按 Next 时 A–B 保存到文本的 `marks` 里，下次每个 turn 自动按段播放。Listening 页的 Mine 组里带录音的文本直接进这种听写。浏览器放不了 `.wma`，要先转成 `.mp3`（见下文），同名即可。
 - **Numbers**（Listening 页）：程序生成的数字听写，每轮十题，从十四类里抽：数字、大数（千、百万、十亿）、年份、世纪、楼层/区/名次（序数词）、时刻、营业时间（两个时刻）、价格、百分比、身高与带小数的量、温度（含负数）、一句话里的两个数、电话号码、日期（可带星期）；数字永远嵌在一句话里念。答案打数字（17h45、9h 18h30、32,60、12,5、-7、1,82、23/10/2026、06 42 18 73 95、「35 12」等格式都接受）。
-- **Forms**（第四个 tab）：变形练习，每题一句话、挖掉一个形式。三种模式：**Choose** 给四个选项，全是同一个词的不同形式（同一时态的其他人称、同一人称的相邻时态、另一性别的分词；形容词的四种形式；代词、冠词、比较级各自的小集合），发音相同的形式优先当干扰项（parlé / parlait / parlaient、a pris / ont pris），点选判对错；**Write** 看到原形和时态（`(aller, passé composé)` 这样的提示写在空格里），打出正确形式；**Hear** 先听整句，再写空格里听到的那个词——parlé / parlait / parlaient 听起来一样，只能靠语法定拼写，这正是听写丢分最多的地方。判分分四档：对、字母对但重音符错、发音对但拼写错（语法）、错；每题给出正确形式、完整句子（可朗读）、英译和一行规则。题材十六组：
+- **Forms**（tab）：变形练习，每题一句话、挖掉一个形式。三种模式：**Choose** 给四个选项，全是同一个词的不同形式（同一时态的其他人称、同一人称的相邻时态、另一性别的分词；形容词的四种形式；代词、冠词、比较级各自的小集合），发音相同的形式优先当干扰项（parlé / parlait / parlaient、a pris / ont pris），点选判对错；**Write** 看到原形和时态（`(aller, passé composé)` 这样的提示写在空格里），打出正确形式；**Hear** 先听整句，再写空格里听到的那个词——parlé / parlait / parlaient 听起来一样，只能靠语法定拼写，这正是听写丢分最多的地方。判分分四档：对、字母对但重音符错、发音对但拼写错（语法）、错；每题给出正确形式、完整句子（可朗读）、英译和一行规则。题材十六组：
   - 动词八个时态（présent、passé composé、imparfait、futur simple、conditionnel、subjonctif、impératif、plus-que-parfait）：`data/forms.js` 里的 `frames` 是带 `{S}`（主语）和 `{V}`（动词）槽位的句型，主语从九个人称代词和九个名字短语里随机抽，`app-forms.js` 里的 conjugator 现场变位（规则动词按词尾，-cer/-ger/-yer/e–è/é–è/appeler–jeter 的拼写变化自动处理，约九十个不规则动词和反身动词有表），所以同一句型每次换主语。否定（`{NV}`）把 ne … pas 一起放进空格。主语是 je / tu / nous / vous 时性别未知，être 类动词的分词各种一致形式都接受。
   - 一致与小词八组，手写题库：形容词性数（beau/bel/belle、-eux/-euse、-al/-aux…）、名词复数（-al/-aux、-eau/-eaux、七个 -ou/-x、yeux、messieurs）、-ment 副词（-emment/-amment）、宾语代词（le/la/les/lui/leur/y/en、次序、重读式）、冠词与所有格（au/aux/du/des、mon amie、cet homme、否定后的 de）、比较级（meilleur/mieux/pire、plus/moins/aussi/autant）、tout/toute/tous/toutes、分词一致（être、avoir + 前置直接宾语、反身）。
   - 每组的正确率记在 `S.stats.forms`，菜单页显示；三种模式共用。不变化的词（difficile、gris、pays）选项不够时补上错误词尾当干扰项，「它不变」本身就是考点。添加题目：`frames` 一行 `["时态", "动词原形", "法语句型", "英译", {s: 主语限制}]`，`items` 一行 `["组", "带 ___ 的句子", "答案|备选", "提示", "英译", "规则"]`。
 - **Slower / Slow**：Dictation、Listen & pick 里的 Slower 按钮和短文页的 Slow 开关不靠 voice 的 rate 参数——Apple 的 Premium / Enhanced voice 基本不理这个参数，所以以前慢速和常速听不出差别——而是把句子切成呼吸组（标点处，再在连词、关系代词、介词前），每组降速念，组之间停顿；任何 voice 上都明显更慢。
+
+## 词库（Words）
+
+Book 只有 300 个词。Words tab 是独立于课程的词库：A1 到 C2 共 6430 个词（A1 1166 · A2 631 · B1 1603 · B2 1522 · C1 806 · C2 702），每个词一个英文释义和一句例句（带英译）。数据在 `data/words-a1.js` … `data/words-c2.js`，每条 `["法语", "pos", "english", "例句", "译文"]`，进度键是 `法语|pos`，所以别改已有词条的拼写和词性。
+
+**选词**（`tools/words-select.py`）：
+
+- 级别取自 FLELex 的 Beacco 版（Pintard & François 2020；FLELex 本体见 François, Gala, Watrin & Fairon, LREC 2014）：它统计每个 lemma 在法语外语教材里各级别的频率，结合 Beacco 的参考词表给出一个 CEFR 级别。许可 CC BY-NC-SA 4.0，所以 `data/words-*.js` 也以 CC BY-NC-SA 4.0 共享（文件头里写了出处）。
+- 级别内的顺序按 Lexique 3.83（Boris New & Christophe Pallier，CC BY-SA 4.0）里的一般频率（电影字幕和书面语的平均，每百万词）：新词按「最常用的先来」出现。
+- FLELex 的高级别噪声大（某本教材专题里的词，例如 C2 里的 tétrapode、dévonien），所以 B2、C1、C2 只收在一般语料里也算常见的词：每百万至少 8、2.5、2.5 次。冠词、物主限定词和 A1 的人称代词不收。
+- 选出的 6663 个 lemma 切成九块，每块由一个 agent 按 `tools/words-brief.md` 写释义和例句，`tools/words-check.py` 检查格式、排版、词性、Lexique 的名词性别、例句里是否真有这个词；标注者删掉了词性标注器的噪声（专名、英语词、被标成名词的动词变位）、与低级别同形词同义的重复条目和两个侮辱性词，共 229 条；重复的 headword + pos 只留最低级别那条。FLELex 把 œ 写成 oe，合成时改回（cœur、œuvre、fœtus；moelle 不动）。`tools/words-assemble.py` 把标注合成 `data/words-*.js`。
+
+**两种练习**：
+
+- **Meaning**：给法语词（自动朗读），四个英文释义选一个；干扰项取同级别、同词性、释义里没有共同实词的词，所以不会出现两个近义的选项。答完显示例句和译文。键盘 1–4 选，Enter 下一个。
+- **Sentence**（造句）：给一个你见过的词和它的释义，用它写一句自己的话。Check 之后：你的句子里那个词（任何变位、变形）被标出来；机器能查的几件事会提示——找不到这个词、名词前的冠词性别不对（`le maison`）、代词式动词缺代词（`je souviens`）、句子太短；然后对照例句，自评 Again / Hard / Good。空着按 Check 等于「想不出来，看例句」。写过的句子存在 **My sentences**，按日期列出，可以朗读、删除；**Copy for correction** 把最近的句子连同词义拼成一段 prompt，贴给任何助手批改（不用 API key）。
+- **Browse**：按级别、状态（新 / 学习中 / 已会 / 到期）筛选，法语或英文搜索，每页 100 条；点开一条看例句，可以直接对这个词造句。
+
+**复习**：词库有自己的 Leitner 盒子（`S.bank`），比 Book 多两格：0 / 1 / 3 / 7 / 14 / 30 / 60 / 120 天。
+
+| 动作 | 效果 |
+|---|---|
+| Meaning：第一次见就答对 | 直接进 box 4（两周后再见：你本来就会） |
+| Meaning：之后答对 | 升一盒，最高到 box 5（一个月） |
+| Sentence：Good | 升一盒，最高到 box 7（四个月） |
+| Sentence：Hard | 盒子不变，间隔减半 |
+| 答错 / Again | 回到 box 0，十分钟后到期；Meaning 里错的词本轮末尾再出一次 |
+
+认得一个词只能把它推到一个月；会用它（造句）才能推到四个月。一轮 Meaning 先出到期的词（最早到期的先），不够再补新词，轮长 10 / 20 / 40 可选；选哪些级别在 Words 页顶上点，存在本设备的设置里。Review 页底部会提示词库里有多少到期。
+
+备份的 Export / Import 包含词库进度和你写的句子：盒子按与 Book 相同的规则合并（最近复习过的那份胜），句子取并集。
 
 ## 进度与复习算法
 
@@ -146,7 +178,7 @@ python3 build.py && git add -A && git commit -m "…" && git push      # 约一�
 
 ## 自测
 
-`test.html`：数据完整性、900 句的挖空扫描、六种练习、听力页、Mine 和录音听写各走一遍；数字生成器每类都要接受自己的答案；conjugator 对照 96 个已知变位，每个句型配每个允许的主语都生成一遍检查槽位、省音和答案。跑完会把你本地的进度恢复原样，朗读是静音的。
+`test.html`：数据完整性、900 句的挖空扫描、六种练习、听力页、Mine 和录音听写各走一遍；词库 6430 条的格式与排版、每条例句里能找到这个词、900 道 Meaning 题的选项、造句检查（变位、冠词性别、代词式动词）、盒子规则、备份合并和三个页面；数字生成器每类都要接受自己的答案；conjugator 对照 96 个已知变位，每个句型配每个允许的主语都生成一遍检查槽位、省音和答案。跑完会把你本地的进度恢复原样，朗读是静音的。
 
 ## 添加阅读
 

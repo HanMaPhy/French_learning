@@ -24,6 +24,12 @@
 <script src="data/reading-b2.js"></script>
 <script src="data/reading-c1.js"></script>
 <script src="data/forms.js"></script>
+<script src="data/words-a1.js"></script>
+<script src="data/words-a2.js"></script>
+<script src="data/words-b1.js"></script>
+<script src="data/words-b2.js"></script>
+<script src="data/words-c1.js"></script>
+<script src="data/words-c2.js"></script>
 <script src="app-core.js"></script>
 <script src="app-listen.js"></script>
 <script src="app-drills.js"></script>
@@ -31,6 +37,7 @@
 <script src="app-audio.js"></script>
 <script src="app-mine.js"></script>
 <script src="app-forms.js"></script>
+<script src="app-words.js"></script>
 <script>
 (async function () {
   const L = [], FULL = []; let fails = 0;
@@ -348,6 +355,68 @@
     tryView('start-from level hides lower levels everywhere', () => { S().settings.minLevel = 'B1'; A.go('book'); if ($$('.lesson-row').length !== 18) throw new Error('rows ' + $$('.lesson-row').length); if (!/180/.test($$('.stat')[0].textContent)) throw new Error($$('.stat')[0].textContent); if (!/A1, A2 are hidden/.test($('#app').textContent)) throw new Error('no hidden-levels note'); A.go('listen'); if ($$('.passage-row').length !== 6) throw new Error('passages ' + $$('.passage-row').length); S().words[A.WORDS[0].key] = { b: 1, d: 0, n: 1 }; if (A.dueWords().some(w => w.lvl === 'A1')) throw new Error('a hidden level is still due'); S().settings.minLevel = 'A1'; });
     tryView('mark lesson as known, then reset it', () => { A.go('lesson', { id: 'a2-1' }); $('#knowAll').click(); $('#knowAll').click(); const l = A.LESSONS['a2-1']; if (!l.words.every(w => A.wstate(w.key).b === 5)) throw new Error('not all in box 5'); $('#resetLesson').click(); $('#resetLesson').click(); if (!l.words.every(w => A.wstate(w.key).n === 0)) throw new Error('not reset'); });
     tryView('progress is written to localStorage', () => { const raw = JSON.parse(localStorage.getItem(LS)); if (!raw || Object.keys(raw.words).length < 50) throw new Error('saved words: ' + (raw && Object.keys(raw.words).length)); });
+    log('— word bank —');
+    { const Bk = A.bank, FB = window.FR_BANK || {}, find = f => Bk.BANK.find(w => w.fr === f), DAYB = A.DAY;
+      check(Bk.BL.every(L => (FB[L] || []).length >= 400), 'six levels: ' + Bk.BL.map(L => L + ':' + (FB[L] || []).length).join(' ') + ' = ' + Bk.BANK.length + ' words');
+      const POSB = new Set(['n.m.', 'n.f.', 'n.m./f.', 'n.m.pl.', 'n.f.pl.', 'v.', 'adj.', 'adv.', 'prep.', 'conj.', 'pron.', 'interj.', 'num.', 'phrase']);
+      check(Bk.BANK.every(w => w.fr && w.en && w.ex && w.exEn && POSB.has(w.pos)), 'every word has a headword, a known pos, a meaning, a model sentence and its translation');
+      const rawN = Bk.BL.reduce((n, L) => n + (FB[L] || []).length, 0); check(rawN === Bk.BANK.length, 'headword + pos is unique (' + (rawN - Bk.BANK.length) + ' repeated)');
+      const typo = Bk.BANK.filter(w => /[’‘  —–]/.test(w.fr + w.en + w.ex + w.exEn) || /"/.test(w.fr + w.ex) || /[^\s«(][?!:;]/.test(w.ex));
+      check(typo.length === 0, 'typography as in the Book: straight apostrophes, a space before ? ! : ;, no dashes' + (typo.length ? ': ' + typo.slice(0, 5).map(w => w.fr).join(', ') : ''));
+      const lost = Bk.BANK.filter(w => !Bk.locate(w, w.ex).length); lost.forEach(w => FULL.push('?  bank ' + w.lvl + ' [' + w.fr + '] not found in its sentence: ' + w.ex));
+      check(lost.length <= Bk.BANK.length * 0.01, 'the word is found in its own model sentence for ' + (Bk.BANK.length - lost.length) + ' of ' + Bk.BANK.length + ' (misses listed below; under 1% allowed)');
+      const sample = Bk.BL.flatMap(L => Bk.BANK.filter(w => w.lvl === L).slice(0, 150)), pc = p => /^n\./.test(p) ? 'n' : p; let badOpt = 0;
+      sample.forEach(w => { const o = Bk.options(w); if (o.length !== 4 || !o.includes(w) || new Set(o.map(x => x.en.toLowerCase())).size !== 4 || o.some(x => x !== w && Bk.clash(w, x))) badOpt++; });
+      check(badOpt === 0, sample.length + ' Meaning cards: four different meanings, the answer among them, no option sharing a content word with it (' + badOpt + ' bad)');
+      const main4 = sample.filter(w => ['n', 'v.', 'adj.', 'adv.'].includes(pc(w.pos)));
+      log('      ' + main4.filter(w => Bk.options(w).every(x => pc(x.pos) === pc(w.pos))).length + ' of ' + main4.length + ' noun/verb/adjective/adverb cards offer only the same part of speech');
+      const al = find('aller'), pr = find('prendre'), bx = find('beau / belle') || find('beau'), mai = find('maison');
+      check(al && Bk.locate(al, 'Demain, nous irons au cinéma.').length === 1 && pr && Bk.locate(pr, 'Elle a pris le dernier train.').length === 1, 'irregular forms are found: irons (aller), pris (prendre)');
+      check(!bx || Bk.locate(bx, 'Quelle belle journée !').length === 1, 'belle is a form of ' + (bx ? bx.fr : 'beau (not in the bank)'));
+      check(mai && Bk.review(mai, 'Nous avons acheté le maison.').notes.some(n => /feminine/.test(n)) && !Bk.review(mai, 'Nous avons acheté la maison.').notes.length && !Bk.review(mai, 'Elle est à la maison depuis hier.').notes.length, 'a noun after the wrong article gets a gender note, after the right one none');
+      const souv = find('se souvenir');
+      if (souv) check(Bk.review(souv, 'Je souviens de mon premier jour.').notes.some(n => /pronominal/.test(n)) && !Bk.review(souv, 'Je me souviens de mon premier jour.').notes.length && !Bk.review(souv, 'Souviens-toi de cette nuit-là.').notes.length, 'a pronominal verb without its pronoun gets a note');
+      else log('      (se souvenir is not in the bank: pronoun check skipped)');
+      check(Bk.review(mai, 'Il fait beau ce matin.').notes.some(n => /can't find/.test(n)), 'a sentence without the word says so');
+      fresh(); const w0 = Bk.BANK[0];
+      Bk.recognised(w0, true); const b1 = Bk.st(w0).b; Bk.recognised(w0, true); Bk.recognised(w0, true); const b2 = Bk.st(w0).b;
+      Bk.produced(w0, 2); Bk.produced(w0, 2); Bk.produced(w0, 2); const b3 = Bk.st(w0).b; Bk.recognised(w0, false); const b4 = Bk.st(w0).b;
+      check(b1 === 4 && b2 === 5 && b3 === 7 && b4 === 0 && !Bk.isDue(w0), 'boxes: right at first sight → 4, Meaning stops at 5, Sentence climbs to 7, a miss → 0 for ten minutes (' + [b1, b2, b3, b4].join(' ') + ')');
+      fresh(); S().bank = { 'x|n.m.': { b: 2, d: Date.now() + 3 * DAYB, n: 2 } }; S().sents = [{ k: 'x|n.m.', w: 'x', s: 'Un.', t: 1 }];
+      const incB = { v: 2, words: {}, settings: {}, bank: { 'x|n.m.': { b: 3, d: Date.now() + 7 * DAYB, n: 3 }, 'y|v.': { b: 6, d: Date.now() + 50 * DAYB, n: 1 } }, sents: [{ k: 'x|n.m.', w: 'x', s: 'Un.', t: 1 }, { k: 'y|v.', w: 'y', s: 'Deux.', t: 2 }] };
+      A.mergeState(incB); A.mergeState(incB);
+      check(S().bank['x|n.m.'].b === 3 && S().bank['y|v.'].b === 6 && S().sents.length === 2 && S().sents[1].s === 'Deux.', 'a backup merges: bank boxes by last review (two-month box included), sentences as a union, twice the same');
+      fresh();
+      tryView('Words page: six level buttons, a round of 20 new A2 words, right → box 4, wrong → box 0 and again at the end, key 1 picks', () => {
+        S().settings.bankLv = ['A2']; A.go('words'); if ($$('[data-wlv]').length !== 6 || !/A1 to C2/.test($('#app').textContent)) throw new Error('page');
+        $('[data-wmode="mean"]').click(); const R = Bk.state(); if (R.items.length !== 20 || !R.items.every(i => i.w.lvl === 'A2' && i.fresh)) throw new Error('round ' + R.items.length);
+        const it = R.items[0]; $$('[data-wopt]').find(b => b.dataset.wopt === it.w.key).click(); if (Bk.st(it.w).b !== 4 || !$('#next') || !$('.result.ok')) throw new Error('right answer');
+        $('#next').click(); const it2 = R.items[1]; $$('[data-wopt]').find(b => b.dataset.wopt !== it2.w.key).click(); if (Bk.st(it2.w).b !== 0 || R.items.length !== 21 || !$('.result.ko')) throw new Error('wrong answer');
+        $('#next').click(); document.dispatchEvent(new KeyboardEvent('keydown', { key: '1', bubbles: true })); if (R.phase !== 'done') throw new Error('key 1');
+        for (let i = 0; i < 40 && R.items[R.i]; i++) { if (R.phase === 'ask') $$('[data-wopt]')[0].click(); $('#next').click(); }
+        if (!$('.done') || !/\/20$/.test($('.done b').textContent.trim())) throw new Error('done ' + ($('.done b') || {}).textContent);
+        A.go('words'); if (!/due now/.test($('#app').textContent)) throw new Error('counts');
+      });
+      tryView('Sentence: the word is marked, Good keeps the sentence, the done page copies a correction prompt, an empty box shows the model', () => {
+        A.go('wdrill', { mode: 'sent', keys: [al.key] }); if (!$('#sent') || $('#check').textContent !== 'Show the model') throw new Error('an empty box should offer the model');
+        $('#sent').value = 'Demain, nous irons au cinéma.'; $('#sent').dispatchEvent(new Event('input')); if ($('#check').textContent !== 'Check') throw new Error('label');
+        $('#check').click(); if (!$('mark') || $('mark').textContent !== 'irons' || $('.wnotes')) throw new Error('mark ' + ($('mark') || {}).textContent);
+        $('[data-wgrade="2"]').click(); if (S().sents.length !== 1 || S().sents[0].s !== 'Demain, nous irons au cinéma.' || Bk.st(al).b !== 1) throw new Error('kept ' + JSON.stringify(S().sents));
+        if (!$('#copyRound') || !/1\. aller \(v\. /.test(Bk.prompt(S().sents))) throw new Error('prompt');
+        A.go('wdrill', { mode: 'sent' }); const R = Bk.state(); if (!R.items.length || R.items[0].w.lvl !== 'A2') throw new Error('round ' + R.items.length);
+        $('#check').click(); if (!$('[data-wgrade]') || $('mark')) throw new Error('show the model without a sentence'); $('[data-wgrade="0"]').click(); if (S().sents.length !== 1) throw new Error('nothing to keep');
+      });
+      tryView('Browse: filters, pages of 100, write from a row; My sentences lists and deletes; Review mentions the bank', () => {
+        A.go('wlist'); if ($$('.wrow').length !== 100) throw new Error('rows ' + $$('.wrow').length);
+        $('#wf').value = 'known'; $('#wf').dispatchEvent(new Event('change')); if (!$$('.wrow').length) throw new Error('known filter');
+        $('#wf').value = 'all'; $('#wf').dispatchEvent(new Event('change')); $('#wlv').value = 'C2'; $('#wlv').dispatchEvent(new Event('change')); if ($$('.wrow').length !== 100 || !$('#wmore')) throw new Error('C2 page');
+        $('#wmore').click(); if ($$('.wrow').length !== 300) throw new Error('more ' + $$('.wrow').length);
+        $('[data-wsent]').click(); if (!$('#sent') || Bk.state().items.length !== 1 || Bk.state().items[0].w.lvl !== 'C2') throw new Error('write from a row');
+        A.go('wsents'); if ($$('[data-wdel]').length !== 1 || !$('#copy20')) throw new Error('list'); $('[data-wdel]').click(); if (S().sents.length || !/Nothing yet/.test($('#app').textContent)) throw new Error('delete');
+        S().bank[Bk.BANK[0].key] = { b: 1, d: 0, n: 1 }; A.go('review'); if (!/Word bank/.test($('#app').textContent) || !$('.read-card[data-go="words"]')) throw new Error('review card');
+      });
+      fresh();
+    }
   } catch (e) { fails++; log('FATAL ' + (e && e.stack || e)); }
   finally { try { if (saved === null) localStorage.removeItem(LS); else localStorage.setItem(LS, saved); sessionStorage.removeItem('allonsy.view'); } catch (e) { /* ignore */ } }
   const out = document.getElementById('out'); out.className = fails ? 'ko' : 'ok';

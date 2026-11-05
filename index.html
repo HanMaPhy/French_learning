@@ -229,6 +229,25 @@ input.dict{width:100%;font:inherit;font-size:1.25rem;padding:10px 12px;border:1p
 select,input[type=text]{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg);max-width:100%}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:9px 16px;border-radius:999px;font-weight:600;font-size:.9rem;z-index:30;box-shadow:var(--shadow);max-width:calc(100% - 32px)}
 .notice{background:var(--warn-soft);color:var(--warn);border-radius:8px;padding:10px 14px;font-size:.95rem}
+/* word bank */
+mark{background:var(--good-soft);color:inherit;border-radius:3px;padding:0 2px;box-shadow:inset 0 -2px 0 var(--good)}
+.wq{text-align:center;display:flex;flex-direction:column;gap:6px;padding:4px 0 8px}
+.wq .fr{font-size:2rem;font-weight:500}
+.wq .pos{font-family:var(--font-fr);font-style:italic;color:var(--fr)}
+.wnotes{margin:8px 0 0;padding-left:20px;font-weight:400;color:var(--warn)}
+.wnotes li{margin:3px 0}
+.wnotes .fi{font-family:var(--font-fr);font-size:1.08em;color:var(--fg)}
+.wrow .speak{width:28px;height:28px}
+.wrow summary{cursor:pointer;list-style:none}
+.wrow summary::-webkit-details-marker{display:none}
+.wrow .g-head .meaning{flex:1 1 12em;min-width:0}
+/* six sections do not fit beside the title on a phone: the nav takes a row of its own under it */
+@media (max-width:600px){
+  .top-in{flex-wrap:wrap;row-gap:4px;padding-block:8px 6px}
+  .nav{order:3;flex:1 0 100%;margin-left:0;justify-content:space-between;overflow-x:auto;scrollbar-width:none}
+  .nav::-webkit-scrollbar{display:none}
+  #settingsBtn{margin-left:auto}
+}
 @media (max-width:480px){
   .nav button{padding:7px 7px;font-size:.86rem}
   .top-in{gap:8px}
@@ -243,9 +262,10 @@ select,input[type=text]{font:inherit;padding:8px 10px;border:1px solid var(--lin
 
 <header class="top">
   <div class="top-in">
-    <div class="brand">Allons-y <small>FRANÇAIS A1–C1</small></div>
+    <div class="brand">Allons-y <small>FRANÇAIS A1–C2</small></div>
     <nav class="nav" id="nav" aria-label="Sections">
       <button data-view="book">Book</button>
+      <button data-view="words">Words</button>
       <button data-view="review">Review</button>
       <button data-view="listen">Listening</button>
       <button data-view="forms">Forms</button>
@@ -261,27 +281,34 @@ select,input[type=text]{font:inherit;padding:8px 10px;border:1px solid var(--lin
   <div class="card"><p class="en">Loading the book…</p></div>
 </main>
 
-<script src="data/vocab-a1.js?v=22"></script>
-<script src="data/vocab-a1b.js?v=22"></script>
-<script src="data/vocab-a2.js?v=22"></script>
-<script src="data/vocab-a2b.js?v=22"></script>
-<script src="data/vocab-b1.js?v=22"></script>
-<script src="data/vocab-b1b.js?v=22"></script>
-<script src="data/vocab-b2.js?v=22"></script>
-<script src="data/vocab-b2b.js?v=22"></script>
-<script src="data/vocab-c1.js?v=22"></script>
-<script src="data/vocab-c1b.js?v=22"></script>
-<script src="data/listening.js?v=22"></script>
-<script src="data/reading-a1.js?v=22"></script>
-<script src="data/reading-a2.js?v=22"></script>
-<script src="data/reading-b1.js?v=22"></script>
-<script src="data/reading-b2.js?v=22"></script>
-<script src="data/reading-c1.js?v=22"></script>
-<script src="data/forms.js?v=22"></script>
-<script src="app-core.js?v=22"></script>
-<script src="app-listen.js?v=22"></script>
-<script src="app-drills.js?v=22"></script>
-<script src="app-reading.js?v=22"></script>
-<script src="app-audio.js?v=22"></script>
-<script src="app-mine.js?v=22"></script>
-<script src="app-forms.js?v=22"></script>
+<script src="data/vocab-a1.js?v=23"></script>
+<script src="data/vocab-a1b.js?v=23"></script>
+<script src="data/vocab-a2.js?v=23"></script>
+<script src="data/vocab-a2b.js?v=23"></script>
+<script src="data/vocab-b1.js?v=23"></script>
+<script src="data/vocab-b1b.js?v=23"></script>
+<script src="data/vocab-b2.js?v=23"></script>
+<script src="data/vocab-b2b.js?v=23"></script>
+<script src="data/vocab-c1.js?v=23"></script>
+<script src="data/vocab-c1b.js?v=23"></script>
+<script src="data/listening.js?v=23"></script>
+<script src="data/reading-a1.js?v=23"></script>
+<script src="data/reading-a2.js?v=23"></script>
+<script src="data/reading-b1.js?v=23"></script>
+<script src="data/reading-b2.js?v=23"></script>
+<script src="data/reading-c1.js?v=23"></script>
+<script src="data/forms.js?v=23"></script>
+<script src="data/words-a1.js?v=23"></script>
+<script src="data/words-a2.js?v=23"></script>
+<script src="data/words-b1.js?v=23"></script>
+<script src="data/words-b2.js?v=23"></script>
+<script src="data/words-c1.js?v=23"></script>
+<script src="data/words-c2.js?v=23"></script>
+<script src="app-core.js?v=23"></script>
+<script src="app-listen.js?v=23"></script>
+<script src="app-drills.js?v=23"></script>
+<script src="app-reading.js?v=23"></script>
+<script src="app-audio.js?v=23"></script>
+<script src="app-mine.js?v=23"></script>
+<script src="app-forms.js?v=23"></script>
+<script src="app-words.js?v=23"></script>
